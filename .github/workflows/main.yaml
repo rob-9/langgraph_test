@@ -1,0 +1,167 @@
+name: Build Docker Image
+
+on:
+  push:
+    paths-ignore:
+      - '.github/**'
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      deployment_tools_branch:
+          description: "Use this branch for deployment-tools"
+          type: string
+          required: true
+          default: main
+
+# allow different branches to built in parallel
+# restart the build in case of new commits during the build process
+concurrency:
+  group: ${{ github.repository }}/${{ github.workflow }}@${{ github.ref_name || 'main' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      SERVICE_NAME: ${{ steps.setup-env-variables.outputs.SERVICE_NAME }}
+      SERVICE_VERSION: ${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          path: app
+
+      - name: Checkout deployment-tools Repository
+        uses: actions/checkout@v4
+        with:
+          repository: zyprova/deployment-tools
+          token: ${{ secrets.DEPLOYMENT_ACCESS_TOKEN }}
+          # inputs will not be defined for automatic builds, take main branch as default.
+          ref: ${{ inputs.deployment_tools_branch || 'main' }}
+          path: deployment-tools
+
+      - name: Login to docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: docker-registry.int.zyprova.com
+          username: ${{ secrets.BUILDBOT_USER }}
+          password: ${{ secrets.BUILDBOT_PASS }}
+
+      - name: 'Automated Version Bump'
+        id: version-bump
+        uses: 'phips28/gh-action-bump-version@master'
+        with:
+          skip-tag: 'true'
+          skip-push:  'true'
+          # disable all wording version increments
+          preid: ${{ github.ref_name == 'main' && '' || env.PREID_BRANCH_NAME }}
+          version-type: ${{ github.ref_name == 'main' && 'patch' || 'prerelease' }}
+          # always bump version based on version-type
+          bump-policy: ignore
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREID_BRANCH_NAME: $(echo ${{ github.ref_name }} | sed 's?^feature/??g' | sed 's?/?-?g')
+          PACKAGEJSON_DIR: 'app'
+
+      - name: Setup environment variables
+        id: setup-env-variables
+        run: |
+          echo "SERVICE_NAME=$(basename "${{ github.repository }}" | sed 's?^zyprova-ui?ui?g')" >> "${GITHUB_OUTPUT}"
+          echo "SERVICE_VERSION=$(echo "${{ steps.version-bump.outputs.newTag }}" | sed 's?^v??g')" >> "${GITHUB_OUTPUT}"
+          echo "CODE_COMMITID=$(cd app && git rev-parse --short HEAD)" >> "${GITHUB_OUTPUT}"
+          echo "CODE_VERSION=$(jq -r .version app/package.json)" >> "${GITHUB_OUTPUT}"
+          echo "DOCKER_REGISTRY=docker-registry.int.zyprova.com" >> "${GITHUB_OUTPUT}"
+          echo "PREID_BRANCH_NAME=$(echo ${{ github.ref_name }} | sed 's?^feature/??g' | sed 's?/?-?g')" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure docker image tags
+        id: docker-image-tags
+        run: |
+          echo "DOCKER_IMAGE_TAGS=${{ github.ref_name == 'main' && format('{0}/{1}:latest', steps.setup-env-variables.outputs.DOCKER_REGISTRY, steps.setup-env-variables.outputs.SERVICE_NAME) || '' }},${{ steps.setup-env-variables.outputs.DOCKER_REGISTRY }}/${{ steps.setup-env-variables.outputs.SERVICE_NAME }}:${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Make sure the new version does not exist
+        run: |
+          ! ./deployment-tools/docker-image-exists "${{ steps.setup-env-variables.outputs.SERVICE_NAME }}" "${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}"
+
+      - name: Setup docker environment
+        uses: docker/setup-buildx-action@v3
+
+      - name: Enable caching based on package.json, etc.
+        run: |
+          jq 'del(.version)' app/package.json > package.json
+          [ -r "app/package-lock.json" ] && {
+            jq 'del(.version) | del(.packages."".version)' app/package-lock.json > package-lock.json
+          } || true
+          [ -r "app/yarn.lock" ] && cp app/yarn.lock yarn.lock || true
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        env:
+          BUILDKIT_PROGRESS: plain
+        with:
+          path: |
+            apk-cache
+            npm-cache
+          key: ${{ runner.os }}-buildx-nodejs-cache-${{ hashFiles('package.json', 'package-lock.json', 'yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-nodejs-cache-
+
+      - name: Inject cache into Docker
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        env:
+          BUILDKIT_PROGRESS: plain
+        with:
+          cache-map: |
+            {
+              "npm-cache": "/root/.npm",
+              "apk-cache": "/var/cache/apk"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+
+      - name: Build docker image
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_REGISTRY: ${{ steps.setup-env-variables.outputs.DOCKER_REGISTRY }}
+          SERVICE_NAME: ${{ steps.setup-env-variables.outputs.SERVICE_NAME }}
+          SERVICE_VERSION: ${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}
+          CODE_VERSION: ${{ steps.setup-env-variables.outputs.CODE_VERSION }}
+          CODE_BRANCH: ${{ github.ref_name }}
+          CODE_COMMITID: ${{ steps.setup-env-variables.outputs.CODE_COMMITID }}
+          PREID_BRANCH_NAME: ${{ steps.setup-env-variables.outputs.PREID_BRANCH_NAME }}
+          BUILDKIT_PROGRESS: plain
+        with:
+          secret-files: |
+            npmrc=./deployment-tools/etc/npmrc.install
+          context: app
+          # make images available to docker CLI in push-version-and-artifacts step
+          load: true
+          # avoid pushing in case of git push failures
+          push: false
+          build-args: |
+            CODE_COMMITID=${{ env.CODE_COMMITID }}
+            CODE_VERSION=${{ env.CODE_VERSION }}
+            CODE_BRANCH=${{ env.CODE_BRANCH }}
+          # push :latest tag for main branch builds
+          tags: ${{ steps.docker-image-tags.outputs.DOCKER_IMAGE_TAGS }}
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/cache/${{ env.SERVICE_NAME }}/${{ env.PREID_BRANCH_NAME }}
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/cache/${{ env.SERVICE_NAME }}/${{ env.PREID_BRANCH_NAME }},mode=max
+
+      - name: 'Push version changes, git tags and docker images'
+        id: push-version-and-artifacts
+        run: |
+          cd app
+          git push --follow-tags
+          for tag in $(echo "${{ steps.docker-image-tags.outputs.DOCKER_IMAGE_TAGS }}" | tr ',' '\n'); do docker push "${tag}"; done
+  deploy:
+    needs: build
+    if: github.event_name == 'push'
+    uses: zyprova/github-workflows/.github/workflows/deploy-backend-to-dev.yaml@main
+    with:
+      service_name: ${{ needs.build.outputs.SERVICE_NAME }}
+      service_version: ${{ needs.build.outputs.SERVICE_VERSION }}
+    secrets: inherit

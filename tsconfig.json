@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "paths": {
+      "~*": ["src/*"],
+      "@test/*": ["test/*"]
+    },
+    "esModuleInterop": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "esnext",
+    "sourceMap": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "sourceRoot": "/src",
+    "inlineSources": true,
+    "incremental": true,
+    "noUnusedLocals": false,
+    "noImplicitAny": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "useDefineForClassFields": false,
+    "lib": ["ES2022"]
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"],
+}

@@ -1,0 +1,61 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version of service to deploy"
+        type: string
+        required: true
+      environment:
+        description: "Environment to deploy to."
+        type: choice
+        options:
+          - prod
+          - dev
+        default: dev
+
+concurrency:
+  group: deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup environment variables
+        id: setup-env-variables
+        run: |
+          echo "SERVICE_NAME=$(basename ${{ github.repository }})" >> "${GITHUB_OUTPUT}"
+          echo "SERVICE_VERSION=${{ inputs.version }}" >> "${GITHUB_OUTPUT}"
+          echo "DOCKER_REGISTRY=docker-registry.int.zyprova.com" >> "${GITHUB_OUTPUT}"
+          case "${{ inputs.environment }}" in
+            prod)
+              echo "WEBHOOK_URL=${{ env.WEBHOOK_URL_PROD }}" >> "${GITHUB_OUTPUT}"
+              echo "WEBHOOK_AUTH_TOKEN=${{ secrets.WEBHOOK_AUTH_TOKEN_PROD }}" >> "${GITHUB_OUTPUT}"
+              echo "DOCKER_COMPOSE_CFG=/home/ubuntu/deployment-tools/docker-compose.yml" >> "${GITHUB_OUTPUT}"
+              ;;
+            dev)
+              echo "WEBHOOK_URL=${{ env.WEBHOOK_URL_DEV }}" >> "${GITHUB_OUTPUT}"
+              echo "WEBHOOK_AUTH_TOKEN=${{ secrets.WEBHOOK_AUTH_TOKEN_DEV }}" >> "${GITHUB_OUTPUT}"
+              echo "DOCKER_COMPOSE_CFG=/home/admini/deploy/docker-compose.yml" >> "${GITHUB_OUTPUT}"
+              ;;
+          esac
+        env:
+          WEBHOOK_URL_PROD: https://api.zyprova.com/webhooks/bccba0e6-3364-46aa-989f-51915a098810/deploy
+          WEBHOOK_URL_DEV: https://dev.zyprova.com/webhooks/ed850b57-f323-4b05-abab-9684b9824464/deploy
+
+      - name: Trigger webhook
+        uses: joelwmale/webhook-action@2.4.1
+        with:
+          url: ${{ steps.setup-env-variables.outputs.WEBHOOK_URL }}
+          body: >-
+            {
+              "auth_token": "${{ steps.setup-env-variables.outputs.WEBHOOK_AUTH_TOKEN }}",
+              "service_name": "${{ steps.setup-env-variables.outputs.SERVICE_NAME }}",
+              "docker_image": "${{ steps.setup-env-variables.outputs.DOCKER_REGISTRY }}/${{ steps.setup-env-variables.outputs.SERVICE_NAME }}:${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}",
+              "service_version": "${{ steps.setup-env-variables.outputs.SERVICE_VERSION }}",
+              "context": "backend",
+              "docker_compose": "${{ steps.setup-env-variables.outputs.DOCKER_COMPOSE_CFG }}"
+            }
+          github_event_payload: true
