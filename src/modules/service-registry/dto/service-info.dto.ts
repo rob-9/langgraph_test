@@ -27,6 +27,14 @@ export class ServiceInfoDto {
   @Expose()
   @IsString()
   @ApiProperty({
+    description: "Description of this agent's specialty.",
+    example: 'I am a data retrieval agent. I can retrieve HR, FP&A, CAP data.',
+  })
+  public readonly description: string;
+
+  @Expose()
+  @IsString()
+  @ApiProperty({
     description: 'Service URL',
     example: 'http://hr-ma:8001',
   })
