@@ -1,23 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { ServiceInfoDto } from './dto/service-info.dto'
+import { ServiceInfoReqDto, ServiceInfoResDto } from './dto/service-info.dto'
 
 @Injectable()
 export class ServiceRegistryService {
-  private services: Map<string, ServiceInfoDto> = new Map();
+  private services: Map<string, ServiceInfoReqDto> = new Map();
 
-  registerService(serviceInfo: ServiceInfoDto): void {
+  registerService(serviceInfo: ServiceInfoReqDto): ServiceInfoResDto {
     this.services.set(serviceInfo.serviceName, serviceInfo);
+    return {
+      serviceName: "zai-ma",
+      serviceToken: "zai-ma-random",
+      version: "0.0.1"
+    }
   }
 
   deregisterService(serviceName: string): void {
     this.services.delete(serviceName);
   }
 
-  getServices(): ServiceInfoDto[] {
+  getServices(): ServiceInfoReqDto[] {
     return Array.from(this.services.values());
   }
 
-  getService(serviceName: string): ServiceInfoDto | undefined {
+  getService(serviceName: string): ServiceInfoReqDto | undefined {
     return this.services.get(serviceName);
   }
 }
