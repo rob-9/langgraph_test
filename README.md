@@ -1,33 +1,43 @@
-# JavaScript Samples
+# zAI Agent
 
-The provided samples are built using [Genkit](https://genkit.dev/) using the Gemini API.
+zAI agent performs financial planning tasks. It uses Google's [A2A Protocol](https://google.github.io/A2A/#/) framework to collaborate with dependant agents.
 
-## Agents
+To run it you'll need to:
 
-- [Movie Agent](src/agents/movie-agent/README.md): Uses TMDB API to search for movie information and answer questions.
-- [Coder Agent](src/agents/coder/README.md): Generates full code files as artifacts.
+1. Optionally update /etc/hosts
+2. Configure .env file.
+3. Run all dependant agents.
 
-## Testing the Agents
+## Optionally update /etc/hosts
 
-First, follow the instructions in the agent's README file, then run `npx tsx ./cli.ts` to start up a command-line client to talk to the agents. Example:
+If running inside docker, you can skip this step. If running natively you'll need to add the following entries into /etc/hosts file. Feel free to change C class subnets (127.0.3, 127.0.4, 127.0.5), if you have something already running on them.
 
-1. Navigate to the samples/js directory:
-    ```bash
-    cd samples/js
-    ```
-2. Run npm install:
-    ```bash
-    npm install
-    ```
-3. Run an agent:
-```bash
-export GEMINI_API_KEY=<your_api_key>
-npm run agents:coder
-
-# in a separate terminal
-npm run a2a:cli
 ```
----
-**NOTE:** 
-This is sample code and not production-quality libraries.
----
+127.0.3.1	zai-ma
+127.0.4.1	dr-ma
+127.0.4.2	hr-ma
+127.0.4.3	finance-ma
+127.0.4.4	equity-ma
+127.0.4.5	planning-ma
+127.0.5.1	analysis-ma
+```
+
+## Configure .env file
+zAI Agent uses Anthropic's Claude LLM. To work with Anthropic you'll need to provide `ANTHROPIC_API_KEY`. Copy `.env.example` to `.env` and enter `ANTHROPIC_API_KEY` before starting zAI agent.
+
+```bash
+cp .env.example .env
+# edit .env and update ANTHROPIC_API_KEY and save
+```
+
+## Run all dependant agents.
+zAI agent needs the following agents to be running (required agents are specified in [src/agent/registered-agents.ts](src/agent/registered-agents.ts). They might have other dependencies, check their README.md files.
+
+1. dr-ma for data retrieval and modification
+2. analysis-ma for performing analysis
+
+## Testing the Agent
+Once everything is up and running run zAI Agent's CLI interface:
+```bash
+npm run cli
+```

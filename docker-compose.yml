@@ -1,0 +1,9 @@
+name: local
+services:
+  zai-ma:
+    image: zai-ma:latest
+    environment:
+      STAGE: ${STAGE}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      - .:/app

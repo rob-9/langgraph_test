@@ -14,14 +14,14 @@ export class RegisteredAgent {
 
 let registeredAgents: RegisteredAgent[] = [
   {
-    client: new A2AClient("http://localhost:42241"),
-    clientUrl: "http://localhost:42241",
+    client: new A2AClient("http://dr-ma:41241"),
+    clientUrl: "http://dr-ma:41241",
     name: "dr-ma",
     status: "connected",
   },
   {
-    client: new A2AClient("http://localhost:42242"),
-    clientUrl: "http://localhost:42242",
+    client: new A2AClient("http://analysis-ma:41241"),
+    clientUrl: "http://analysis-ms:41241",
     name: "analysis-ma",
     status: "connected",
   },

@@ -1,5 +1,5 @@
 {
-  "name": "hr-ma",
+  "name": "zai-ma",
   "version": "0.0.1",
   "main": "dist/index.js",
   "type": "module",
@@ -9,8 +9,9 @@
     "typescript": "^5.8.2"
   },
   "scripts": {
-    "cli": "npx tsx src/cli.ts http://localhost:41241",
-    "agent": "npx tsx src/agent/index.ts",
+    "cli": "npx tsx src/cli.ts http://zai-ma:41241",
+    "start:dev": "npx tsx src/agent/index.ts",
+    "start:prod": "npx tsx src/agent/index.ts",
     "clean": "rm -rf node_modules package-lock.json dist"
   },
   "dependencies": {

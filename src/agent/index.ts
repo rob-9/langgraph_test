@@ -104,12 +104,11 @@ async function* taskReceived({
   return;
 }
 
-const port: number = 41241
 const agentCard: AgentCard = {
   name: AGENT_NAME,
   description:
   "An agent that can perform corporate planning and analysis.",
-  url: `http://localhost:${port}`,
+  url: 'http://zai-ma:41241',
   provider: {
     organization: "zyprova-internal",
   },
@@ -140,7 +139,7 @@ const agentCard: AgentCard = {
 
 const server = new A2AServer(taskReceived, { card: agentCard });
 
-server.start(port);
+server.start();
 
 logger.log(`Server started on ${agentCard.url}`, AGENT_NAME);
 logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);

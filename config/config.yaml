@@ -8,6 +8,16 @@ defaults: &defaults
       RouterExplorer: warn
       HttpException: log
 
+  agent: &agent
+    port: 41241
+    host: localhost
+
+    registered-agents:
+      dr-ma:
+        endpoint: http://dr-ma:41241
+      analysis-ma:
+        endpoint: http://analysis-ma:42242
+
 stages:
   local:
     <<: *defaults
