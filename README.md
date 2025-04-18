@@ -7,6 +7,7 @@ To run it you'll need to:
 1. Optionally update /etc/hosts
 2. Configure .env file.
 3. Run all dependant agents.
+4. Start this agent.
 
 ## Optionally update /etc/hosts
 
@@ -36,8 +37,19 @@ zAI agent needs the following agents to be running (required agents are specifie
 1. dr-ma for data retrieval and modification
 2. analysis-ma for performing analysis
 
-## Testing the Agent
-Once everything is up and running run zAI Agent's CLI interface:
+## Start this agent
+```bash
+# activate .env
+set -a
+source .env
+set +a
+# start the agent
+STAGE=local npm run start:dev
+```
+
+### Testing the Agent
+Once everything is up and running (including dependent agents) run zAI Agent's CLI interface:
 ```bash
 npm run cli
 ```
+
