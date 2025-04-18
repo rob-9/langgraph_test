@@ -53,3 +53,25 @@ Once everything is up and running (including dependent agents) run zAI Agent's C
 npm run cli
 ```
 
+## Docker
+### Changing docker-compose.yml file (optionaly)
+Remove the folowing two lines from docker-compose.yml file:
+```
+    volumes:
+      - .:/app
+```
+
+### Build the docker image
+```bash
+docker build --secret id=npmrc,src=$HOME/.npmrc -t  zai-ma:latest .
+```
+
+### Run the docker image
+```bash
+docker compose up
+```
+
+### Run docker CLI
+```bash
+docker compose exec -ti zai-ma npm run cli
+```
