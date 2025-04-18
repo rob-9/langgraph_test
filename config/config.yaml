@@ -1,88 +1,13 @@
 defaults: &defaults
 
-  http: &http
-    port: 3001
-    hostname: 0.0.0.0
-    log: true
-    cors:
-      url:
-      all: true
-
-  swagger:
-    enabled: true
-    prefix: docs
-    username: admin
-    password: admin
-
-  jwtAuth: &jwtAuth
-    secret: very!secret
-    expiresIn: 30m
-    refreshTokenExpiresIn: 30d
-    issuer: zyprova.com
-
-  notification: &notification
-    linkBaseUrl: "https://dev.zyprova.com/"
-
   logger: &logger
     output: console
-    # default log level
     level: debug
     contexts:
-      # per context log level
       InstanceLoader: warn
       RouterExplorer: warn
       HttpException: log
 
-  kafka:
-    brokers: [
-      'localhost:9092'
-    ]
-
-  caching:
-    defaultTTLInSeconds: 86400
-    clearCache: false
-
 stages:
   local:
     <<: *defaults
-
-  development:
-    <<: *defaults
-    http:
-      <<: *http
-      cors:
-        # Define all origins that are allowed to access the server
-        url:
-        all: true
-    kafka:
-      brokers: [
-        'kafka:19092'
-      ]
-    logger:
-      <<: *logger
-      output: json
-
-  staging:
-    <<: *defaults
-    http:
-      <<: *http
-      cors:
-        # Define all origins that are allowed to access the server
-        url:
-        all: true
-    logger:
-      <<: *logger
-      output: json
-
-  production:
-    <<: *defaults
-    http:
-      <<: *http
-      cors:
-        # Define all origins that are allowed to access the server
-        url:
-        all: true
-    logger:
-      <<: *logger
-      output: json
-
