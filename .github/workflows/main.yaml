@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - '.github/**'
     branches:
-      - disabled
+      - main
 
   workflow_dispatch:
     inputs:
