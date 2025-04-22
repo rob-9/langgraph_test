@@ -3,20 +3,15 @@ import { Anthropic } from '@anthropic-ai/sdk';
 import { getRegisteredAgent, getRegisteredAgents } from './registered-agents.js';
 import { generateTaskId } from './utils.js';
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
+import { AgentTask } from './agent-task.js';
 
-export class AgentTask {
-  taskId: number;
-  agent: string;
-  description: string;
-  response?: string;
-  response_metadata?: Task | string;
+const MOCKED_TASKS: boolean = false;
 
-  constructor(data: Record<string, any>) {
-    this.taskId = data.taskId;
-    this.agent = data.agent;
-    this.description = data.description;
-  }
+const apiKey = process.env['ANTHROPIC_API_KEY'];
+if (!apiKey) {
+  throw Error('Please configure API key via ANTHROPIC_API_KEY variable.');
 }
+const llm: Anthropic = new Anthropic({ apiKey: apiKey });
 
 var systemPrompt = '';
 
@@ -43,8 +38,19 @@ function getSystemPrompt(): string {
   return systemPrompt;
 }
 
-export async function generateTasks(client: Anthropic, question: string): Promise<AgentTask[] | null> {
-  const response = await client.messages.create({
+export async function generateTasks(question: string): Promise<AgentTask[] | null> {
+  if (MOCKED_TASKS) {
+    logger.warn('generateTasks is mocked.', 'planning');
+    return [
+      {
+        taskId: 1,
+        agent: 'dr-ma',
+        description: 'How many employees do we have?',
+      },
+    ];
+  }
+
+  const response = await llm.messages.create({
     max_tokens: 1024,
     system: getSystemPrompt(),
     messages: [
@@ -63,7 +69,7 @@ Don't explain why you are doing things or what do they mean.
 
   const r = response.content[0];
   if (r.type !== 'text') {
-    console.error(
+    logger.error(
       `Unable to convert question: ${question} to graphql query. ${JSON.stringify(response)}`,
       'text-to-graphql',
     );

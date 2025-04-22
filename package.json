@@ -22,7 +22,7 @@
     "graphql-request": "^7.1.2",
     "pnpm": "^10.9.0",
     "yarn": "^1.22.22",
-    "zyprova-common-lib": "^1.0.78"
+    "zyprova-common-lib": "^1.0.91"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",

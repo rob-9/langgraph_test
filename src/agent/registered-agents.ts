@@ -1,7 +1,9 @@
 import { A2AClient } from '../client/client.js';
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
 import { AgentCard } from '../schema.js';
-import { generateSystemPrompt } from './tasks.js';
+import { generateSystemPrompt } from './llm.js';
+import { AgentConfig } from 'zyprova-common-lib/dist/ai-agent/ai-agent.config.js';
+import { agentConfig } from './config.js';
 
 export type RegisteredAgentStatus = 'disconnected' | 'connected' | 'unknown';
 
@@ -44,9 +46,6 @@ export class RegisteredAgent {
   }
 }
 
-/* List of needed agents before this agent can provide any service */
-let agentsEndpoints: string[] = ['http://dr-ma:41241', 'http://analysis-ma:41241'];
-
 type AgentName = string;
 const registeredAgents: Record<AgentName, RegisteredAgent> = {};
 
@@ -81,21 +80,23 @@ async function registerAgent(url: string): Promise<boolean> {
   return false;
 }
 
-export async function waitForRegisteredAgents(): Promise<void> {
+export async function waitForRegisteredAgents(config: AgentConfig): Promise<void> {
   while (true) {
-    const unregisteredAgents = agentsEndpoints.filter(agentUrl => !isAgentRegistered(agentUrl));
+    const unregisteredAgents = config.requiredAgents.filter(agentUrl => !isAgentRegistered(agentUrl));
     if (unregisteredAgents.length === 0) {
-      logger.debug('agent-registration complete.', 'agent-registration');
+      logger.debug('No registered agents, continuing.', 'agent-registration');
       return;
     }
 
-    logger.debug(`Waiting for agents: ${unregisteredAgents.length}/${agentsEndpoints.length}`, 'agent-registration');
-    let registeredAgentsCount = 0;
-
+    logger.debug(
+      `Waiting for agents: ${unregisteredAgents.length}/${config.requiredAgents.length}`,
+      'agent-registration',
+    );
     const agentsRegistered: Promise<boolean>[] = [];
     for (const agentUrl of unregisteredAgents) {
       agentsRegistered.push(registerAgent(agentUrl));
     }
+
     const results = await Promise.all(agentsRegistered);
     if (results.filter(r => r === true).length == unregisteredAgents.length) {
       /* all agents registered */
@@ -104,11 +105,11 @@ export async function waitForRegisteredAgents(): Promise<void> {
       return;
     }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 10 * 1000)); // wait 10 seconds before rediscovering agents
   }
 }
 
 export async function waitForAgents(): Promise<void> {
   logger.debug(`waitForAgents`, 'agent-registration');
-  return await waitForRegisteredAgents();
+  return await waitForRegisteredAgents(agentConfig);
 }

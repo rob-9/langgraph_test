@@ -1,19 +1,12 @@
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
-import { GenerationResponseError, MessageData } from 'genkit';
+import { MessageData } from 'genkit';
 import { TaskYieldUpdate } from '../server/index.js';
 import { TaskContext, A2AServer } from '../server/index.js';
-import { AgentCard, Task, TextPart } from '../schema.js';
-import Anthropic from '@anthropic-ai/sdk';
-import { AgentTask, generateTasks, getTaskResponse, delegateAgentTask, generateSummary } from './tasks.js';
+import { Task, TextPart } from '../schema.js';
+import { generateTasks, getTaskResponse, delegateAgentTask, generateSummary } from './llm.js';
 import { waitForAgents } from './registered-agents.js';
-
-const apiKey = process.env['ANTHROPIC_API_KEY'];
-if (!apiKey) {
-  throw Error('Please configure API key via ANTHROPIC_API_KEY variable.');
-}
-const MOCKED_TASKS: boolean = false;
-const AGENT_NAME = 'zAI';
-const llm: Anthropic = new Anthropic({ apiKey: apiKey });
+import { AGENT_NAME, AGENT_CARD } from './agent-card.js';
+import { getListenIpAddressFromUrl, getPortFromUrl } from './utils.js';
 
 async function* taskReceived({
   task,
@@ -57,20 +50,9 @@ async function* taskReceived({
 
   logger.log(`question: ${question}`, AGENT_NAME);
   let internal_data: Record<string, unknown> = {};
-  let tasks: AgentTask[] = [];
 
-  if (MOCKED_TASKS) {
-    tasks = [
-      {
-        taskId: 1,
-        agent: 'dr-ma',
-        description: 'How many employees do we have?',
-      },
-    ];
-  } else {
-    tasks = await generateTasks(llm, question);
-    internal_data.tasks = tasks;
-  }
+  const tasks = await generateTasks(question);
+  internal_data.tasks = tasks;
 
   for await (const task of tasks) {
     const response = await delegateAgentTask(task.agent, task.description);
@@ -82,6 +64,8 @@ async function* taskReceived({
   }
 
   const summary = generateSummary(tasks);
+
+  logger.log(`response: ${summary}`, AGENT_NAME);
 
   yield {
     state: 'completed',
@@ -100,41 +84,11 @@ async function* taskReceived({
   return;
 }
 
-const agentCard: AgentCard = {
-  name: AGENT_NAME,
-  description: 'An agent that can perform corporate planning and analysis.',
-  url: 'http://zai-ma:41241',
-  provider: {
-    organization: 'zyprova-internal',
-  },
-  version: '0.0.1',
-  capabilities: {
-    streaming: true,
-    pushNotifications: false,
-    stateTransitionHistory: true,
-  },
-  authentication: null,
-  defaultInputModes: ['text'],
-  defaultOutputModes: ['text'],
-  skills: [
-    {
-      id: 'corporate-planning',
-      name: 'zAI Agent',
-      description: 'Corporate planning and analysis.',
-      tags: ['financial', 'planning'],
-      examples: [
-        'I need help to predict profit and loss. Please conduct a predictive analysis to forecast profit and loss for rest of the year, that is from April to December. Assume 20% annual headcount increase, 500% sales revenue increase by the end of year. Please provide month by month forcast for each accont. Please run analysis for each line item in the attached report and share factor used, also provide commentary for overall profit and loss by the end of the year after your forecast.',
-        'How many employees does the company have?',
-        'How would a plan with 4 L4 employees look like? What would be the impact?',
-      ],
-    },
-  ],
-};
-
-const server = new A2AServer(taskReceived, { card: agentCard });
+const server = new A2AServer(taskReceived, { card: AGENT_CARD });
 
 waitForAgents().then(() => {
-  server.start(41241, 'zai-ma');
-  logger.log(`Server started on ${agentCard.url}`, AGENT_NAME);
-  logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);
+  const listenPort = getPortFromUrl(AGENT_CARD.url);
+  const listenIpAddress = getListenIpAddressFromUrl(AGENT_CARD.url);
+  server.start(listenPort, listenIpAddress);
+  logger.log(`A2AServer started at ${listenIpAddress}:${listenPort}, discoverable at ${AGENT_CARD.url}`, AGENT_NAME);
 });
