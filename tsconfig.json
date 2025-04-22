@@ -5,7 +5,9 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "esModuleInterop": true, // Often helpful with NodeNext
-    "resolveJsonModule": true // Good practice for importing JSON if needed
+    "resolveJsonModule": true, // Good practice for importing JSON if needed
+    "sourceMap": true,
+    "inlineSources": true
   },
   "include": ["src/**/*.ts"]
 }

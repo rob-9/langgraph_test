@@ -18,6 +18,7 @@ import {
   delegateAgentTask,
   generateSummary,
 } from './tasks.js';
+import { waitForAgents } from './registered-agents.js';
 
 const apiKey = process.env["ANTHROPIC_API_KEY"];
 if (!apiKey) {
@@ -60,6 +61,18 @@ async function* taskReceived({
   const last_message = messages[messages.length - 1]
   const last_content_message = last_message.content[last_message.content.length - 1]
   const question = last_content_message.text
+  if (!question) {
+    yield {
+      state: "failed",
+      message: {
+        role: "agent",
+        parts: [
+          { type: "text", text: "Unable to extract question from the context." }
+        ],
+      },
+    };
+    return;
+  }
   
   logger.log(`question: ${question}`, AGENT_NAME);
   let internal_data: Record<string, unknown> = {}
@@ -139,7 +152,10 @@ const agentCard: AgentCard = {
 
 const server = new A2AServer(taskReceived, { card: agentCard });
 
-server.start();
+waitForAgents()
+.then(() => {
+  server.start(41241, 'zai-ma');
+  logger.log(`Server started on ${agentCard.url}`, AGENT_NAME);
+  logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);  
+});
 
-logger.log(`Server started on ${agentCard.url}`, AGENT_NAME);
-logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);

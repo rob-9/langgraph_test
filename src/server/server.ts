@@ -139,7 +139,7 @@ export class A2AServer {
    * @param port Port number to listen on. Defaults to 41241.
    * @returns The running Express application instance.
    */
-  start(port = 41241): express.Express {
+  start(port = 41241, host = '0.0.0.0'): express.Express {
     const app = express();
 
     // Configure CORS
@@ -167,7 +167,7 @@ export class A2AServer {
     app.use(this.errorHandler);
 
     // Start listening
-    app.listen(port, () => {
+    app.listen(port, host, () => {
       console.log(
         `A2A Server listening on port ${port} at path ${this.basePath}`
       );
@@ -272,6 +272,7 @@ export class A2AServer {
           role: "agent",
           parts: [
             {
+              type: 'text',
               text: `Handler failed: ${
                 handlerError instanceof Error
                   ? handlerError.message
@@ -440,6 +441,7 @@ export class A2AServer {
           role: "agent",
           parts: [
             {
+              type: 'text',
               text: `Handler failed: ${
                 handlerError instanceof Error
                   ? handlerError.message
@@ -528,7 +530,7 @@ export class A2AServer {
       state: "canceled",
       message: {
         role: "agent",
-        parts: [{ text: "Task cancelled by request." }],
+        parts: [{ type: 'text', text: "Task cancelled by request." }],
       },
     };
     data = this.applyUpdateToTaskAndHistory(data, cancelUpdate);

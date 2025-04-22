@@ -10,7 +10,7 @@ export class AgentTask {
   description: string;
   response?: string;
   response_metadata?: Task | string;
-
+  
   constructor(data: Record<string, any>) {
     this.taskId = data.taskId;
     this.agent = data.agent;
@@ -18,7 +18,7 @@ export class AgentTask {
   }
 }
 
-export async function generateTasks(client: Anthropic, question: string): Promise<AgentTask[]> {
+export async function generateTasks(client: Anthropic, question: string): Promise<AgentTask[] | null> {
   const response = await client.messages.create({
     max_tokens: 1024,
     system:
@@ -47,17 +47,17 @@ Don't explain why you are doing things or what do they mean.
     console.error(`Unable to convert question: ${question} to graphql query. ${JSON.stringify(response)}`, "text-to-graphql")
     return null;
   }
-
+  
   return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data));
 }
 
 export function getTaskResponse(response: Task | string): string {
   if (typeof(response) === 'string') {
-      return response;
+    return response;
   }
   
   if (response.status.message && response.status.message.parts.length > 0 && "text" in response.status.message.parts[0]) {
-      return response.status.message.parts[0].text;
+    return response.status.message.parts[0].text;
   }
   
   return `ERROR parsing object: ${JSON.stringify(response)}`;
@@ -69,11 +69,11 @@ export async function delegateAgentTask(agent: string, task: string): Promise<Ta
   const remoteTask: TaskSendParams = {
     id: currentTaskId,
     message: {
-    role: "user",
+      role: "user",
       parts: [{ type: "text", text: task }],
     },
   };
-
+  
   try {
     const result = await connectedAgent.client.sendTask(remoteTask);
     logger.debug(`result: ${JSON.stringify(result)}`, "agentDelegate");
@@ -86,10 +86,10 @@ export async function delegateAgentTask(agent: string, task: string): Promise<Ta
 export function generateSummary(tasks: AgentTask[]): string {
   const responses = tasks.map((t) => t.response );
   logger.debug(`tasks.responses=${responses}`, "generateSummary")
-
+  
   if (tasks.length == 1) {
     return tasks[0].response;
   }
-
+  
   throw Error(`Don't know how to generate summary of multiple tasks yet: ${JSON.stringify(responses)}`);
 }
