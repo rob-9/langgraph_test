@@ -1,6 +1,7 @@
 import { A2AClient } from '../client/client.js';
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
 import { AgentCard } from '../schema.js';
+import { generateSystemPrompt } from './tasks.js';
 
 export type RegisteredAgentStatus = 'disconnected' | 'connected' | 'unknown';
 
@@ -37,6 +38,10 @@ export class RegisteredAgent {
   isRegistered() {
     return this.agentCard !== null;
   }
+
+  getAgentCard(): Readonly<AgentCard> {
+    return this.agentCard;
+  }
 }
 
 /* List of needed agents before this agent can provide any service */
@@ -48,6 +53,10 @@ const registeredAgents: Record<AgentName, RegisteredAgent> = {};
 export function getRegisteredAgent(agentName: string): RegisteredAgent | null {
   if (agentName in registeredAgents) return registeredAgents[agentName];
   return null;
+}
+
+export function getRegisteredAgents(): RegisteredAgent[] {
+  return Object.values(registeredAgents);
 }
 
 function isAgentRegistered(agentUrl: string): boolean {
@@ -91,6 +100,7 @@ export async function waitForRegisteredAgents(): Promise<void> {
     if (results.filter(r => r === true).length == unregisteredAgents.length) {
       /* all agents registered */
       logger.log('All agents successfully registered.', 'agent-registration');
+      generateSystemPrompt();
       return;
     }
 

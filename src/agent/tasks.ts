@@ -1,6 +1,6 @@
 import { Task, TaskSendParams } from '../schema.js';
 import { Anthropic } from '@anthropic-ai/sdk';
-import { getRegisteredAgent } from './registered-agents.js';
+import { getRegisteredAgent, getRegisteredAgents } from './registered-agents.js';
 import { generateTaskId } from './utils.js';
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
 
@@ -18,14 +18,35 @@ export class AgentTask {
   }
 }
 
+var systemPrompt = '';
+
+export function generateSystemPrompt(): string {
+  let systemPromptHeader =
+    'You receive questions from user, then route questions to appropriate agents, and summarize their responses.\n';
+  systemPrompt = systemPromptHeader;
+
+  for (const agent of getRegisteredAgents()) {
+    const agentCard = agent.getAgentCard();
+    const agentSkill = agentCard.description;
+    const agentName = agentCard.name;
+    systemPrompt += agentName + ' agent skills: \n';
+    for (const skill of agentCard.skills) {
+      systemPrompt += ' - ' + skill.description + '\n';
+    }
+    systemPrompt += '\n';
+  }
+  logger.debug(`System prompt generated: ${systemPrompt}`, 'system-prompt');
+  return systemPrompt;
+}
+
+function getSystemPrompt(): string {
+  return systemPrompt;
+}
+
 export async function generateTasks(client: Anthropic, question: string): Promise<AgentTask[] | null> {
   const response = await client.messages.create({
     max_tokens: 1024,
-    system: `You receive questions from user, then route questions to appropriate agents, and summarize their responses.
-dr-ma agent has access to data for human resources, capital, and finances. It can perform CRUD operations on these datasets from human resources, to plans, etc.
-analysis-ma agent can perform analysis between two sets of data.
-forecast-ma agent can perform forecasts.
-`,
+    system: getSystemPrompt(),
     messages: [
       {
         role: 'user',
