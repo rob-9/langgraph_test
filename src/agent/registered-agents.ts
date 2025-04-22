@@ -46,7 +46,8 @@ type AgentName = string;
 const registeredAgents: Record<AgentName, RegisteredAgent> = {};
 
 export function getRegisteredAgent(agentName: string): RegisteredAgent | null {
-  return registeredAgents?.agentName ?? null;
+  if (agentName in registeredAgents) return registeredAgents[agentName];
+  return null;
 }
 
 function isAgentRegistered(agentUrl: string): boolean {
@@ -89,6 +90,7 @@ export async function waitForRegisteredAgents(): Promise<void> {
     const results = await Promise.all(agentsRegistered);
     if (results.filter(r => r === true).length == unregisteredAgents.length) {
       /* all agents registered */
+      logger.log('All agents successfully registered.', 'agent-registration');
       return;
     }
 
