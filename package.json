@@ -3,19 +3,13 @@
   "version": "0.0.1",
   "main": "dist/index.js",
   "type": "module",
-  "devDependencies": {
-    "@types/node": "^22.14.1",
-    "prettier": "^3.5.3",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.3"
-  },
   "scripts": {
     "cli": "npx tsx src/cli.ts http://zai-ma:41241",
     "start:dev": "npx tsx watch src/agent/index.ts",
     "start:debug": "npx tsx --inspect-brk src/agent/index.ts",
     "start:prod": "npx tsx src/agent/index.ts",
     "clean": "rm -rf node_modules package-lock.json dist",
-    "prettier-format": "prettier 'src/**/*.ts' --write"
+    "prettier-format": "prettier --write --config .preetierrc 'src/agent/**/*.ts' src/version.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -29,6 +23,12 @@
     "pnpm": "^10.9.0",
     "yarn": "^1.22.22",
     "zyprova-common-lib": "^1.0.78"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
 }

@@ -1,32 +1,19 @@
 import { logger } from 'zyprova-common-lib/dist/logging/logger.js';
-import { GenerationResponseError, MessageData } from "genkit";
+import { GenerationResponseError, MessageData } from 'genkit';
 import { TaskYieldUpdate } from '../server/index.js';
-import {
-  TaskContext,
-  A2AServer,
-} from "../server/index.js";
-import {
-  AgentCard,
-  Task,
-  TextPart
-} from "../schema.js";
+import { TaskContext, A2AServer } from '../server/index.js';
+import { AgentCard, Task, TextPart } from '../schema.js';
 import Anthropic from '@anthropic-ai/sdk';
-import {
-  AgentTask,
-  generateTasks,
-  getTaskResponse,
-  delegateAgentTask,
-  generateSummary,
-} from './tasks.js';
+import { AgentTask, generateTasks, getTaskResponse, delegateAgentTask, generateSummary } from './tasks.js';
 import { waitForAgents } from './registered-agents.js';
 
-const apiKey = process.env["ANTHROPIC_API_KEY"];
+const apiKey = process.env['ANTHROPIC_API_KEY'];
 if (!apiKey) {
-  throw Error("Please configure API key via ANTHROPIC_API_KEY variable.");
+  throw Error('Please configure API key via ANTHROPIC_API_KEY variable.');
 }
-const MOCKED_TASKS: boolean = false
-const AGENT_NAME = "zAI";
-const llm: Anthropic = new Anthropic({apiKey: apiKey});
+const MOCKED_TASKS: boolean = false;
+const AGENT_NAME = 'zAI';
+const llm: Anthropic = new Anthropic({ apiKey: apiKey });
 
 async function* taskReceived({
   task,
@@ -34,63 +21,57 @@ async function* taskReceived({
 }: TaskContext): AsyncGenerator<TaskYieldUpdate, Task | void, unknown> {
   // Use AsyncGenerator and correct return type
   const messages: MessageData[] = (history ?? [])
-  .map((m) => ({
-    role: (m.role === "agent" ? "model" : "user") as "user" | "model",
-    content: m.parts
-    .filter((p): p is TextPart => !!(p as TextPart).text)
-    .map((p) => ({ text: p.text })),
-  }))
-  .filter((m) => m.content.length > 0);
-  
+    .map(m => ({
+      role: (m.role === 'agent' ? 'model' : 'user') as 'user' | 'model',
+      content: m.parts.filter((p): p is TextPart => !!(p as TextPart).text).map(p => ({ text: p.text })),
+    }))
+    .filter(m => m.content.length > 0);
+
   if (messages.length === 0) {
     console.warn(`${AGENT_NAME} No history/messages found for task ${task.id}`);
     yield {
-      state: "failed",
+      state: 'failed',
       message: {
-        role: "agent",
-        parts: [
-          { type: "text", text: "No input message found." }
-        ],
+        role: 'agent',
+        parts: [{ type: 'text', text: 'No input message found.' }],
       },
     };
     return;
   }
-  
-  logger.debug(`messages: ${JSON.stringify(messages)}`, AGENT_NAME)
-  
-  const last_message = messages[messages.length - 1]
-  const last_content_message = last_message.content[last_message.content.length - 1]
-  const question = last_content_message.text
+
+  logger.debug(`messages: ${JSON.stringify(messages)}`, AGENT_NAME);
+
+  const last_message = messages[messages.length - 1];
+  const last_content_message = last_message.content[last_message.content.length - 1];
+  const question = last_content_message.text;
   if (!question) {
     yield {
-      state: "failed",
+      state: 'failed',
       message: {
-        role: "agent",
-        parts: [
-          { type: "text", text: "Unable to extract question from the context." }
-        ],
+        role: 'agent',
+        parts: [{ type: 'text', text: 'Unable to extract question from the context.' }],
       },
     };
     return;
   }
-  
+
   logger.log(`question: ${question}`, AGENT_NAME);
-  let internal_data: Record<string, unknown> = {}
-  let tasks: AgentTask[] = []
-  
+  let internal_data: Record<string, unknown> = {};
+  let tasks: AgentTask[] = [];
+
   if (MOCKED_TASKS) {
     tasks = [
       {
         taskId: 1,
-        agent: "dr-ma",
-        description: "How many employees do we have?"
-      }
-    ]
+        agent: 'dr-ma',
+        description: 'How many employees do we have?',
+      },
+    ];
   } else {
     tasks = await generateTasks(llm, question);
-    internal_data.tasks = tasks
+    internal_data.tasks = tasks;
   }
-  
+
   for await (const task of tasks) {
     const response = await delegateAgentTask(task.agent, task.description);
     if (response) {
@@ -99,52 +80,52 @@ async function* taskReceived({
       logger.debug(`${task.agent}: ${JSON.stringify(task)}`, AGENT_NAME);
     }
   }
-  
+
   const summary = generateSummary(tasks);
-  
+
   yield {
-    state: "completed",
+    state: 'completed',
     message: {
-      role: "agent",
+      role: 'agent',
       parts: [
         {
-          type: "text", text: summary, metadata: internal_data
-        }
+          type: 'text',
+          text: summary,
+          metadata: internal_data,
+        },
       ],
     },
   };
-  
+
   return;
 }
 
 const agentCard: AgentCard = {
   name: AGENT_NAME,
-  description:
-  "An agent that can perform corporate planning and analysis.",
+  description: 'An agent that can perform corporate planning and analysis.',
   url: 'http://zai-ma:41241',
   provider: {
-    organization: "zyprova-internal",
+    organization: 'zyprova-internal',
   },
-  version: "0.0.1",
+  version: '0.0.1',
   capabilities: {
     streaming: true,
     pushNotifications: false,
     stateTransitionHistory: true,
   },
   authentication: null,
-  defaultInputModes: ["text"],
-  defaultOutputModes: ["text"],
+  defaultInputModes: ['text'],
+  defaultOutputModes: ['text'],
   skills: [
     {
-      id: "corporate-planning",
-      name: "zAI Agent",
-      description:
-      "Corporate planning and analysis.",
-      tags: ["financial", "planning" ],
+      id: 'corporate-planning',
+      name: 'zAI Agent',
+      description: 'Corporate planning and analysis.',
+      tags: ['financial', 'planning'],
       examples: [
-        "I need help to predict profit and loss. Please conduct a predictive analysis to forecast profit and loss for rest of the year, that is from April to December. Assume 20% annual headcount increase, 500% sales revenue increase by the end of year. Please provide month by month forcast for each accont. Please run analysis for each line item in the attached report and share factor used, also provide commentary for overall profit and loss by the end of the year after your forecast.",
-        "How many employees does the company have?",
-        "How would a plan with 4 L4 employees look like? What would be the impact?"
+        'I need help to predict profit and loss. Please conduct a predictive analysis to forecast profit and loss for rest of the year, that is from April to December. Assume 20% annual headcount increase, 500% sales revenue increase by the end of year. Please provide month by month forcast for each accont. Please run analysis for each line item in the attached report and share factor used, also provide commentary for overall profit and loss by the end of the year after your forecast.',
+        'How many employees does the company have?',
+        'How would a plan with 4 L4 employees look like? What would be the impact?',
       ],
     },
   ],
@@ -152,10 +133,8 @@ const agentCard: AgentCard = {
 
 const server = new A2AServer(taskReceived, { card: agentCard });
 
-waitForAgents()
-.then(() => {
+waitForAgents().then(() => {
   server.start(41241, 'zai-ma');
   logger.log(`Server started on ${agentCard.url}`, AGENT_NAME);
-  logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);  
+  logger.log(`Press Ctrl+C to stop the server`, AGENT_NAME);
 });
-
