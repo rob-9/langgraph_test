@@ -52,6 +52,22 @@ async function* taskReceived({
   let internal_data: Record<string, unknown> = {};
 
   const tasks = await generateTasks(question);
+  if (tasks.length == 0) {
+    yield {
+      state: 'failed',
+      message: {
+        role: 'agent',
+        parts: [
+          {
+            type: 'text',
+            text: 'I do not understand what needs to be done.',
+            metadata: internal_data,
+          },
+        ],
+      },
+    };
+    return;
+  }
   internal_data.tasks = tasks;
 
   for await (const task of tasks) {

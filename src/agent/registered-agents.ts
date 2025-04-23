@@ -12,11 +12,10 @@ export class RegisteredAgent {
 
   readonly client: A2AClient;
   private status: RegisteredAgentStatus;
-  private agentCard: AgentCard | null;
+  private agentCard: AgentCard;
 
   constructor(url: string) {
     this.clientUrl = url;
-    this.agentCard = null;
     this.client = new A2AClient(this.clientUrl);
   }
 
@@ -81,6 +80,11 @@ async function registerAgent(url: string): Promise<boolean> {
 }
 
 export async function waitForRegisteredAgents(config: AgentConfig): Promise<void> {
+  if (!config.requiredAgents) {
+    logger.debug('No required agents, continuing.', 'agent-registration');
+    return;
+  }
+
   while (true) {
     const unregisteredAgents = config.requiredAgents.filter(agentUrl => !isAgentRegistered(agentUrl));
     if (unregisteredAgents.length === 0) {

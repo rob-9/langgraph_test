@@ -38,7 +38,7 @@ function getSystemPrompt(): string {
   return systemPrompt;
 }
 
-export async function generateTasks(question: string): Promise<AgentTask[] | null> {
+export async function generateTasks(question: string): Promise<AgentTask[]> {
   if (MOCKED_TASKS) {
     logger.warn('generateTasks is mocked.', 'planning');
     return [
@@ -73,7 +73,7 @@ Don't explain why you are doing things or what do they mean.
       `Unable to convert question: ${question} to graphql query. ${JSON.stringify(response)}`,
       'text-to-graphql',
     );
-    return null;
+    return [];
   }
 
   return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data));
@@ -97,6 +97,9 @@ export function getTaskResponse(response: Task | string): string {
 
 export async function delegateAgentTask(agent: string, task: string): Promise<Task | string> {
   const connectedAgent = getRegisteredAgent(agent);
+  if (!connectedAgent) {
+    return `ERROR: unable to find registered agent ${agent}`;
+  }
   const currentTaskId = generateTaskId();
   const remoteTask: TaskSendParams = {
     id: currentTaskId,
@@ -108,6 +111,10 @@ export async function delegateAgentTask(agent: string, task: string): Promise<Ta
 
   try {
     const result = await connectedAgent.client.sendTask(remoteTask);
+    if (!result) {
+      logger.debug('task submitted, nothing returned.', 'agentDelegate');
+      return '';
+    }
     logger.debug(`result: ${JSON.stringify(result)}`, 'agentDelegate');
     return result;
   } catch (error: any) {
@@ -116,11 +123,10 @@ export async function delegateAgentTask(agent: string, task: string): Promise<Ta
 }
 
 export function generateSummary(tasks: AgentTask[]): string {
-  const responses = tasks.map(t => t.response);
-  logger.debug(`tasks.responses=${responses}`, 'generateSummary');
-
-  if (tasks.length == 1) {
-    return tasks[0].response;
+  const responses = tasks.map(t => t?.response ?? '');
+  logger.debug(`tasks.responses=${JSON.stringify(responses)}`, 'generateSummary');
+  if (responses.length == 1) {
+    return responses[0];
   }
 
   throw Error(`Don't know how to generate summary of multiple tasks yet: ${JSON.stringify(responses)}`);

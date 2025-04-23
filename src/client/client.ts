@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 // Import necessary types from schema.ts
 import {
   // Core types

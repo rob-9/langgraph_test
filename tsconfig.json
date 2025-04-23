@@ -3,11 +3,26 @@
     "target": "es2022",
     "module": "NodeNext",
     "skipLibCheck": true,
-    "outDir": "dist",
     "esModuleInterop": true, // Often helpful with NodeNext
     "resolveJsonModule": true, // Good practice for importing JSON if needed
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "sourceRoot": "/src",
     "sourceMap": true,
-    "inlineSources": true
+    "inlineSources": true,
+    "incremental": true,
+    "noUnusedLocals": false,
+    "noImplicitAny": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
