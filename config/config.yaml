@@ -11,7 +11,7 @@ defaults: &defaults
   agent: &agent
     required-agents:
       - http://dr-ma:41241
-      - http://analysis-ma:42242
+      - http://analysis-ma:41241
 
 stages:
   local:
