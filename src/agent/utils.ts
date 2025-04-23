@@ -28,7 +28,7 @@ export function getListenIpAddressFromUrl(url: string): string {
     return '0.0.0.0';
   }
 
-  return _url.host;
+  return _url.hostname;
 }
 
 export async function resolveHostname(hostname: string): Promise<string> {

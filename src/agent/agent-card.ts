@@ -1,10 +1,9 @@
 import { AgentCard } from '../schema.js';
 import { agentConfig } from './config.js';
-import { hostname } from 'node:os';
-import { resolveHostname } from './utils.js';
 import { logger } from 'zyprova-common-lib/dist/logging/index.js';
+import { resolveHostname } from './utils.js';
 
-async function getConfiguredAgentUrl(agentName: string): Promise<string> {
+export async function getConfiguredAgentUrl(agentName: string): Promise<string> {
   if (agentConfig.url) return agentConfig.url;
 
   /**
@@ -57,7 +56,7 @@ export const AGENT_CARD: AgentCard = {
       description: 'Corporate planning and analysis.',
       tags: ['financial', 'planning'],
       examples: [
-        'I need help to predict profit and loss. Please conduct a predictive analysis to forecast profit and loss for rest of the year, that is from April to December. Assume 20% annual headcount increase, 500% sales revenue increase by the end of year. Please provide month by month forcast for each accont. Please run analysis for each line item in the attached report and share factor used, also provide commentary for overall profit and loss by the end of the year after your forecast.',
+        'I need help to predict profit and loss. Please conduct a predictive analysis to forecast profit and loss for rest of the year, that is from April to December. Assume 20% annual headcount increase, 500% sales revenue increase by the end of year. Please provide month by month forecast for each account. Please run analysis for each line item in the attached report and share factor used, also provide commentary for overall profit and loss by the end of the year after your forecast.',
         'How many employees does the company have?',
         'How would a plan with 4 L4 employees look like? What would be the impact?',
       ],

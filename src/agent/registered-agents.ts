@@ -20,7 +20,7 @@ export class RegisteredAgent {
   }
 
   async discover(): Promise<AgentCard | null> {
-    if (this.agentCard !== null) {
+    if (this.agentCard) {
       return this.agentCard;
     }
 
