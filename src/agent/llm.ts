@@ -24,11 +24,10 @@ export function generateSystemPrompt(): string {
     const agentCard = agent.getAgentCard();
     const agentSkill = agentCard.description;
     const agentName = agentCard.name;
-    systemPrompt += agentName + ' agent skills: \n';
+    systemPrompt += agentName + ':\n';
     for (const skill of agentCard.skills) {
       systemPrompt += ' - ' + skill.description + '\n';
     }
-    systemPrompt += '\n';
   }
   logger.debug(`System prompt generated: ${systemPrompt}`, 'system-prompt');
   return systemPrompt;
