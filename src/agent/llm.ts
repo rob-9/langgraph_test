@@ -49,18 +49,22 @@ export async function generateTasks(question: string): Promise<AgentTask[]> {
     ];
   }
 
+  const user_prompt = `
+You were given the following question:
+${question}
+Use known agents to answer it. If possible, preserve the original question unless the question has to be broken down into multiple questions.
+Generate a list of questions that each agent needs to answer. Use the following JSON structure: [{ "taskId": 1, "agent": "agent name", "description": "question" }, ...].
+Don't explain why you are doing things or what do they mean.
+`;
+
+  console.debug(user_prompt, 'generate-tasks.user-prompt');
   const response = await llm.messages.create({
     max_tokens: 1024,
     system: getSystemPrompt(),
     messages: [
       {
         role: 'user',
-        content: `You were given the following question:
-${question}
-Use known agents to answer it. If possible, preserve the original question unless the question has to be broken down into multiple questions.
-Generate a list of questions that each agent needs to answer. Use the following JSON structure: [{ "taskId": 1, "agent": "agent name", "description": "question" }, ...].
-Don't explain why you are doing things or what do they mean.
-`,
+        content: user_prompt,
       },
     ],
     model: 'claude-3-5-sonnet-latest',
@@ -125,7 +129,7 @@ export async function delegateAgentTask(task: AgentTask): Promise<Task | string>
 
 export function generateSummary(tasks: AgentTask[]): string {
   const responses = tasks.map(t => t?.response ?? '');
-  logger.debug(`tasks.responses=${JSON.stringify(responses)}`, 'generateSummary');
+  logger.debug(JSON.stringify(responses), 'generateSummary');
   if (responses.length == 1) {
     return responses[0];
   }
