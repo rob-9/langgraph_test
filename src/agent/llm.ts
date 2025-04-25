@@ -75,6 +75,7 @@ Don't explain why you are doing things or what do they mean.
     return [];
   }
 
+  logger.debug(`${r.text}`, `task-list`);
   return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data));
 }
 

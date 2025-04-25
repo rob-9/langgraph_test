@@ -32,7 +32,7 @@ async function* taskReceived({
     return;
   }
 
-  logger.debug(`messages: ${JSON.stringify(messages)}`, AGENT_NAME);
+  logger.debug(JSON.stringify(messages), 'task-received');
   const last_message = messages[messages.length - 1];
   const last_content_message = last_message.content[last_message.content.length - 1];
   const question = last_content_message.text;
@@ -47,7 +47,8 @@ async function* taskReceived({
     return;
   }
 
-  logger.log(`question: ${question}`, AGENT_NAME);
+  logger.log(question, 'question');
+
   let internal_data: Record<string, unknown> = {};
   const tasks = await generateTasks(question);
   if (tasks.length == 0) {
@@ -67,20 +68,20 @@ async function* taskReceived({
     return;
   }
   internal_data.tasks = tasks;
-
+  logger.log(JSON.stringify(tasks), 'task-list');
   for await (const t of tasks) {
     t.metadata = task.metadata;
     const response = await delegateAgentTask(t);
     if (response) {
       t.response = getTaskResponse(response);
       t.response_metadata = response;
-      logger.debug(`${t.agent}: ${JSON.stringify(t)}`, AGENT_NAME);
+      logger.debug(`${JSON.stringify(t)}`, 'task-response');
     }
   }
 
   const summary = generateSummary(tasks);
 
-  logger.log(`response: ${summary}`, AGENT_NAME);
+  logger.log(summary, 'response');
 
   yield {
     state: 'completed',
