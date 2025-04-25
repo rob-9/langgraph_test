@@ -33,7 +33,6 @@ async function* taskReceived({
   }
 
   logger.debug(`messages: ${JSON.stringify(messages)}`, AGENT_NAME);
-
   const last_message = messages[messages.length - 1];
   const last_content_message = last_message.content[last_message.content.length - 1];
   const question = last_content_message.text;
@@ -50,7 +49,6 @@ async function* taskReceived({
 
   logger.log(`question: ${question}`, AGENT_NAME);
   let internal_data: Record<string, unknown> = {};
-
   const tasks = await generateTasks(question);
   if (tasks.length == 0) {
     yield {
@@ -70,12 +68,13 @@ async function* taskReceived({
   }
   internal_data.tasks = tasks;
 
-  for await (const task of tasks) {
-    const response = await delegateAgentTask(task.agent, task.description);
+  for await (const t of tasks) {
+    t.metadata = task.metadata;
+    const response = await delegateAgentTask(t);
     if (response) {
-      task.response = getTaskResponse(response);
-      task.response_metadata = response;
-      logger.debug(`${task.agent}: ${JSON.stringify(task)}`, AGENT_NAME);
+      t.response = getTaskResponse(response);
+      t.response_metadata = response;
+      logger.debug(`${t.agent}: ${JSON.stringify(t)}`, AGENT_NAME);
     }
   }
 

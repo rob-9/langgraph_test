@@ -94,18 +94,19 @@ export function getTaskResponse(response: Task | string): string {
   return `ERROR parsing object: ${JSON.stringify(response)}`;
 }
 
-export async function delegateAgentTask(agent: string, task: string): Promise<Task | string> {
-  const connectedAgent = getRegisteredAgent(agent);
+export async function delegateAgentTask(task: AgentTask): Promise<Task | string> {
+  const connectedAgent = getRegisteredAgent(task.agent);
   if (!connectedAgent) {
-    return `ERROR: unable to find registered agent ${agent}`;
+    return `ERROR: unable to find registered agent ${task.agent}`;
   }
   const currentTaskId = generateTaskId();
   const remoteTask: TaskSendParams = {
     id: currentTaskId,
     message: {
       role: 'user',
-      parts: [{ type: 'text', text: task }],
+      parts: [{ type: 'text', text: task.description }],
     },
+    metadata: task.metadata,
   };
 
   try {
