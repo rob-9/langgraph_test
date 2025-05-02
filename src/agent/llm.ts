@@ -83,6 +83,23 @@ Don't explain why you are doing things or what do they mean.
   return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data));
 }
 
+export function getTaskMetadata(agentTasks: AgentTask[]): Record<string, any> {
+  const metadata: Record<string, any> = {}
+  metadata.queries = [];
+  for (const agentTask of agentTasks) {
+    const responseMetadata = agentTask.response_metadata as Task;
+    if (!responseMetadata) continue;
+    if (!responseMetadata.status.message) continue;
+    if (responseMetadata.status.message.role !== 'agent') continue;
+    for (const part of responseMetadata.status.message.parts) {
+      if (!part.metadata) continue;
+      if (!part.metadata?.queries) continue;
+      metadata.queries = [...metadata.queries, part.metadata.queries]
+    }
+  }
+  return metadata;
+}
+
 export function getTaskResponse(response: Task | string): string {
   if (typeof response === 'string') {
     return response;

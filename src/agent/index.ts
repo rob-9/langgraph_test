@@ -3,7 +3,7 @@ import { MessageData } from 'genkit';
 import { TaskYieldUpdate } from '../server/index.js';
 import { TaskContext, A2AServer } from '../server/index.js';
 import { Task, TextPart } from '../schema.js';
-import { generateTasks, getTaskResponse, delegateAgentTask, generateSummary } from './llm.js';
+import { generateTasks, getTaskResponse, delegateAgentTask, generateSummary, getTaskMetadata } from './llm.js';
 import { waitForAgents } from './registered-agents.js';
 import { AGENT_NAME, AGENT_CARD } from './agent-card.js';
 import { getListenIpAddressFromUrl, getPortFromUrl } from './utils.js';
@@ -91,7 +91,7 @@ async function* taskReceived({
         {
           type: 'text',
           text: summary,
-          metadata: internal_data,
+          metadata: getTaskMetadata(tasks),
         },
       ],
     },
