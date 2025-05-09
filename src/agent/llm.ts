@@ -37,12 +37,13 @@ function getSystemPrompt(): string {
   return systemPrompt;
 }
 
-export async function generateTasks(question: string): Promise<AgentTask[]> {
+export async function generateTasks(question: string, sessionId: string): Promise<AgentTask[]> {
   if (MOCKED_TASKS) {
     logger.warn('generateTasks is mocked.', 'planning');
     return [
       {
         taskId: 1,
+        sessionId: sessionId,
         agent: 'dr-ma',
         description: 'How many employees do we have?',
       },
@@ -80,7 +81,7 @@ Don't explain why you are doing things or what do they mean.
   }
 
   logger.debug(`${r.text}`, `task-list`);
-  return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data));
+  return JSON.parse(r.text).map((data: Record<string, any>) => new AgentTask(data, sessionId));
 }
 
 export function getTaskMetadata(agentTasks: AgentTask[]): Record<string, any> {
@@ -124,6 +125,7 @@ export async function delegateAgentTask(task: AgentTask): Promise<Task | string>
   const currentTaskId = generateTaskId();
   const remoteTask: TaskSendParams = {
     id: currentTaskId,
+    sessionId: task.sessionId,
     message: {
       role: 'user',
       parts: [{ type: 'text', text: task.description }],

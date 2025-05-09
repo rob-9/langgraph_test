@@ -7,6 +7,7 @@ import { generateTasks, getTaskResponse, delegateAgentTask, generateSummary, get
 import { waitForAgents } from './registered-agents.js';
 import { AGENT_NAME, AGENT_CARD } from './agent-card.js';
 import { getListenIpAddressFromUrl, getPortFromUrl } from './utils.js';
+import { generateTaskId } from './utils.js';
 
 async function* taskReceived({
   task,
@@ -47,10 +48,10 @@ async function* taskReceived({
     return;
   }
 
-  logger.log(question, 'question');
-
+  const sessionId = task.sessionId ?? generateTaskId()
+  logger.log(`question: ${question} id: ${task.id} sessionId: ${sessionId}`, 'question');
   let internal_data: Record<string, unknown> = {};
-  const tasks = await generateTasks(question);
+  const tasks = await generateTasks(question, sessionId);
   if (tasks.length == 0) {
     yield {
       state: 'failed',
@@ -80,8 +81,7 @@ async function* taskReceived({
   }
 
   const summary = generateSummary(tasks);
-
-  logger.log(summary, 'response');
+  logger.log(`response: ${summary} id: ${task.id} sessionId: ${sessionId}`, 'response');
 
   yield {
     state: 'completed',
