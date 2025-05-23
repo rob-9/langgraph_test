@@ -4,8 +4,6 @@ on:
   push:
     paths-ignore:
       - '.github/**'
-    branches:
-      - main
 
   workflow_dispatch:
     inputs:
@@ -159,7 +157,7 @@ jobs:
           for tag in $(echo "${{ steps.docker-image-tags.outputs.DOCKER_IMAGE_TAGS }}" | tr ',' '\n'); do docker push "${tag}"; done
   deploy:
     needs: build
-    if: github.event_name == 'push'
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'main') || inputs.auto_deploy == true }}
     uses: zyprova/github-workflows/.github/workflows/deploy-backend-to-dev.yaml@main
     with:
       service_name: ${{ needs.build.outputs.SERVICE_NAME }}
