@@ -89,8 +89,8 @@ Analyze this user query and determine if it's SIMPLE or COMPLEX:
 
 Query: "${lastMessage.content}"
 
-A SIMPLE query is one that can be answered directly with existing knowledge (greetings, definitions, basic facts).
-A COMPLEX query requires multiple steps, research, planning, or problem-solving.
+A SIMPLE query is one that can be answered directly with existing knowledge (greetings, definitions, basic facts) that does not need a workflow to answer. 
+A COMPLEX query requires multiple steps, research, planning, or problem-solving to generate a satisfactory response.
 
 Respond with only "SIMPLE" or "COMPLEX":
 `);
@@ -134,6 +134,8 @@ Format your response as:
 2. [Step 2]
 3. [Step 3]
 ...
+
+Use a maximum of 7 steps.
 `);
 
   const response = await model.invoke([planningPrompt]); // 106: Ask model to create plan
