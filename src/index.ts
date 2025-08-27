@@ -44,7 +44,7 @@ const PlanAnnotation = Annotation.Root({
 
 // model client instance - low temp -> 
 const model = new ChatAnthropic({
-  model: 'claude-3-haiku-20240307',
+  model: 'claude-3-7-sonnet-20250219',
   apiKey: process.env.ANTHROPIC_API_KEY,
   temperature: 0.7,
 });
@@ -128,20 +128,42 @@ function shouldContinue(state: typeof PlanAnnotation.State) {
     return 'simple';                                  // 125: Route to simple response handler
   }
   if (!state.plan || state.plan.length === 0) {      // 127: If no plan exists yet
-    return 'plan';                                    // 128: Route to plan creation
+    return 'createPlan';                              // 128: Route to plan creation
   }
   return 'end';                                       // 130: Otherwise finish workflow
 }
 
 // workflow graph construction - defines agent's decision flow
+
+/*
+          __start__
+              |
+              v
+        ┌─────────────-┐
+        │   classify   │
+        │(classifyQuery)
+        └─────-┬───────┘
+               │
+        shouldContinue()
+          /         \
+        v             v
+  ┌──────────--┐  ┌──────────--┐
+  │   simple   │  │ createPlan │
+  │(simpleResp)│  |(createPlan)│
+  └────┬────--─┘  └────┬─────--┘
+       │               │
+       v               v
+     __end__        __end__
+*/
+
 const workflow = new StateGraph(PlanAnnotation)       // 133: Create graph with state schema
   .addNode('classify', classifyQuery)                  // 134: Add query classification node
   .addNode('simple', simpleResponse)                   // 135: Add simple response handler
-  .addNode('plan', createPlan)                         // 136: Add plan creation node
+  .addNode('createPlan', createPlan)                   // 136: Add plan creation node
   .addEdge('__start__', 'classify')                    // 137: Start with classification
   .addConditionalEdges('classify', shouldContinue)     // 138: Route based on complexity
   .addEdge('simple', '__end__')                        // 139: Simple queries end here
-  .addEdge('plan', '__end__');                         // 140: Planning ends workflow
+  .addEdge('createPlan', '__end__');                   // 140: Planning ends workflow
 
 const app = workflow.compile();                        // 142: Compile graph into executable
 
@@ -151,6 +173,7 @@ async function runAgent(userInput: string) {
   
   const initialState = {                               // 147: Set up initial state
     messages: [new HumanMessage(userInput)],           // 148: Wrap input as message
+    isComplex: false,
     plan: [],                                          // 149: Empty plan initially
     currentStep: 0                                     // 150: Start at step 0
   };
