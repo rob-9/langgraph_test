@@ -12,15 +12,26 @@ import { StateGraph, MessagesAnnotation, Annotation } from '@langchain/langgraph
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
 
-// defines shape of workflow's state.
+// task representation for parallel execution
+interface Task {
+  id: string; // unique identifier for tracking
+  description: string; // human readable task description
+  dependencies: string[]; // array of task IDs that must complete first
+  status: 'pending' | 'running' | 'completed' | 'failed'; // execution status
+  result?: string; // task execution result once completed
+  startTime?: Date; // when task execution began
+  endTime?: Date; // when task execution finished
+}
+// defines shape of workflow's state for parallel execution
 interface PlanState {
   messages: (HumanMessage | AIMessage)[]; // stores both types of messages
   isComplex: boolean; // messages can be both simple and complex
-  plan: string[]; // ordered list of steps fo complex queries
-  currentStep: number; // index to track progress through plan[]
+  tasks: Task[]; // array of tasks with parallel execution support
+  allTasksCompleted: boolean; // flag to track when all tasks are done
+  executionResults: string[]; // aggregated results from completed tasks
 }
 
-// declares the fields that make up the graph’s state and how they should be merged when multiple nodes return updates
+// declares the fields that make up the graph's state and how they should be merged when multiple nodes return updates
 const PlanAnnotation = Annotation.Root({
   // messages: Annotation<(HumanMessage | AIMessage)[]>({
   //   reducer: (x, y) => x.concat(y) // append new messages to existing messages[]
@@ -34,11 +45,31 @@ const PlanAnnotation = Annotation.Root({
   isComplex: Annotation<boolean>({
     reducer: (x, y) => y ?? x // if not complex then stays False otherwise True
   }),
-  plan: Annotation<string[]>({
-    reducer: (x, y) => y ?? x // if node computes a plan, then use it. otherwise stay null
+  
+  // parallel task execution state fields
+  tasks: Annotation<Task[]>({
+    reducer: (prev = [], next = []) => {
+      if (next.length === 0) return prev; // if no new tasks, keep previous
+      // merge tasks by ID, preferring newer task data for updates
+      const merged = [...prev];
+      next.forEach(newTask => {
+        const existingIndex = merged.findIndex(t => t.id === newTask.id);
+        if (existingIndex >= 0) {
+          merged[existingIndex] = newTask; // update existing task
+        } else {
+          merged.push(newTask); // add new task
+        }
+      });
+      return merged;
+    }
   }),
-  currentStep: Annotation<number>({
-    reducer: (x, y) => y ?? x // if node progresses then update step. otherwise stay same
+  
+  allTasksCompleted: Annotation<boolean>({
+    reducer: (x, y) => y ?? x // update completion status when provided
+  }),
+  
+  executionResults: Annotation<string[]>({
+    reducer: (prev = [], next = []) => prev.concat(next) // accumulate results
   })
 });
 
