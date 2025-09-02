@@ -107,20 +107,19 @@ async function createPlan(state: typeof PlanAnnotation.State) {
   const lastMessage = state.messages[state.messages.length - 1];
   
   const planningPrompt = new HumanMessage(`
-Create a step-by-step plan to answer this complex query:
+Create a concise, actionable plan to complete this task:
 
 Query: "${lastMessage.content}"
 
-Provide a numbered list of specific steps needed to address this query thoroughly.
-Each step should be clear and actionable.
+Provide 2-4 specific, executable steps that directly accomplish the task.
+Focus on concrete actions, not explanations or theory.
 
 Format your response as:
 1. [Step 1]
 2. [Step 2]
 3. [Step 3]
-...
 
-Use a maximum of 7 steps.
+Maximum 4 steps. Each step should produce a concrete deliverable.
 `);
 
   const response = await model.invoke([planningPrompt]);
@@ -172,6 +171,10 @@ function shouldContinue(state: typeof PlanAnnotation.State) {
   if (!state.plan || state.plan.length === 0) {
     return 'createPlan';
   }
+  const currentStep = state.currentStep || 0;
+  if (currentStep < state.plan.length) {
+    return 'executeStep';
+  }
   return 'end';
 }
 
@@ -190,8 +193,17 @@ function shouldContinue(state: typeof PlanAnnotation.State) {
  │  simple │  │createPlan│
  └────┬────┘  └────┬─────┘
       │            │
-      v            v
-   __end__      __end__
+      v      shouldContinue()
+   __end__         │
+                   v
+             ┌─────────────┐
+             │ executeStep │◄─┐
+             └─────┬───────┘  │
+                   │          │
+            shouldContinue()  │
+              /         \     │
+            v             \   │
+         __end__           \──┘
 */
 
 /*
@@ -219,10 +231,12 @@ const workflow = new StateGraph(PlanAnnotation)
   .addNode('classify', classifyQuery)
   .addNode('simple', simpleResponse)
   .addNode('createPlan', createPlan)
+  .addNode('executeStep', executeStep)
   .addEdge('__start__', 'classify')
   .addConditionalEdges('classify', shouldContinue)
-  .addEdge('simple', '__end__')
-  .addEdge('createPlan', '__end__');
+  .addConditionalEdges('createPlan', shouldContinue)
+  .addConditionalEdges('executeStep', shouldContinue)
+  .addEdge('simple', '__end__');
 
 const app = workflow.compile();
 
@@ -235,12 +249,21 @@ async function runAgent(userInput: string) {
     plan: []
   };
   
-  const result = await app.invoke(initialState);
-  const lastMessage = result.messages[result.messages.length - 1];
+  const stream = await app.stream(initialState);
+  let finalResult;
   
-  console.log(`Agent: ${lastMessage.content}`);
+  for await (const step of stream) {
+    const nodeName = Object.keys(step)[0];
+    const nodeResult = step[nodeName];
+    finalResult = nodeResult;
+    
+    if (nodeResult.messages && nodeResult.messages.length > 0) {
+      const lastMessage = nodeResult.messages[nodeResult.messages.length - 1];
+      console.log(`[${nodeName}]: ${lastMessage.content}`);
+    }
+  }
   
-  return lastMessage.content;
+  return finalResult?.messages?.[finalResult.messages.length - 1]?.content || 'No response';
 }
 
 async function main() {
