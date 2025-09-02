@@ -1,67 +1,49 @@
-// read .env and populate process.env
 import 'dotenv/config';
-
-// wrapper around claude model
 import { ChatAnthropic } from '@langchain/anthropic';
-
-// stategraph: to build stateful agents. graph with nodes, edges, and conditional routing
-// messagesannotation: declares how state fields are merged
 import { StateGraph, MessagesAnnotation, Annotation } from '@langchain/langgraph';
-
-// user / human input vs model / agent reply
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
 
-// task representation for parallel execution
 interface Task {
-  id: string; // unique identifier for tracking
-  description: string; // human readable task description
-  dependencies: string[]; // array of task IDs that must complete first
-  status: 'pending' | 'running' | 'completed' | 'failed'; // execution status
-  result?: string; // task execution result once completed
-  startTime?: Date; // when task execution began
-  endTime?: Date; // when task execution finished
+  id: string;
+  description: string;
+  dependencies: string[];
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  result?: string;
+  startTime?: Date;
+  endTime?: Date;
 }
-// defines shape of workflow's state for parallel execution
 interface PlanState {
-  messages: (HumanMessage | AIMessage)[]; // stores both types of messages
-  isComplex: boolean; // messages can be both simple and complex
-  tasks: Task[]; // array of tasks with parallel execution support
-  allTasksCompleted: boolean; // flag to track when all tasks are done
-  executionResults: string[]; // aggregated results from completed tasks
+  messages: (HumanMessage | AIMessage)[];
+  isComplex: boolean;
+  tasks: Task[];
+  allTasksCompleted: boolean;
+  executionResults: string[];
 }
 
-// declares the fields that make up the graph's state and how they should be merged when multiple nodes return updates
 const PlanAnnotation = Annotation.Root({
-  // messages: Annotation<(HumanMessage | AIMessage)[]>({
-  //   reducer: (x, y) => x.concat(y) // append new messages to existing messages[]
-  // }),
-
-  // SAFER REDUCER - prevents crashes from null concats
   messages: Annotation<(HumanMessage | AIMessage)[]>({
     reducer: (prev = [], next = []) => prev.concat(next)
   }),
 
   isComplex: Annotation<boolean>({
-    reducer: (x, y) => y ?? x // if not complex then stays False otherwise True
+    reducer: (x, y) => y ?? x
   }),
   
   plan: Annotation<string[]>({
-    reducer: (prev = [], next = []) => next.length > 0 ? next : prev // replace plan when provided
+    reducer: (prev = [], next = []) => next.length > 0 ? next : prev
   }),
   
-  // parallel task execution state fields
   tasks: Annotation<Task[]>({
     reducer: (prev = [], next = []) => {
-      if (next.length === 0) return prev; // if no new tasks, keep previous
-      // merge tasks by ID, preferring newer task data for updates
+      if (next.length === 0) return prev;
       const merged = [...prev];
       next.forEach(newTask => {
         const existingIndex = merged.findIndex(t => t.id === newTask.id);
         if (existingIndex >= 0) {
-          merged[existingIndex] = newTask; // update existing task
+          merged[existingIndex] = newTask;
         } else {
-          merged.push(newTask); // add new task
+          merged.push(newTask);
         }
       });
       return merged;
@@ -69,26 +51,24 @@ const PlanAnnotation = Annotation.Root({
   }),
   
   allTasksCompleted: Annotation<boolean>({
-    reducer: (x, y) => y ?? x // update completion status when provided
+    reducer: (x, y) => y ?? x
   }),
   
   executionResults: Annotation<string[]>({
-    reducer: (prev = [], next = []) => prev.concat(next) // accumulate results
+    reducer: (prev = [], next = []) => prev.concat(next)
   })
 });
 
-// model client instance - low temp -> 
 const model = new ChatAnthropic({
   model: 'claude-3-7-sonnet-20250219',
   apiKey: process.env.ANTHROPIC_API_KEY,
   temperature: 0.7,
 });
 
-// analyzes user queries to determine complexity and routing path
 async function classifyQuery(state: typeof PlanAnnotation.State) {
-  const lastMessage = state.messages[state.messages.length - 1];  // 54: Extract most recent user message
+  const lastMessage = state.messages[state.messages.length - 1];
   
-  const classificationPrompt = new HumanMessage(`               // 56: Create classification prompt
+  const classificationPrompt = new HumanMessage(`
 Analyze this user query and determine if it's SIMPLE or COMPLEX:
 
 Query: "${lastMessage.content}"
@@ -99,31 +79,28 @@ A COMPLEX query requires multiple steps, research, planning, or problem-solving 
 Respond with only "SIMPLE" or "COMPLEX":
 `);
 
-  const response = await model.invoke([classificationPrompt]);    // 67: Send prompt to model for analysis
-  const isComplex = response.content.toString().trim().toUpperCase() === 'COMPLEX'; // 68: Parse and normalize response
+  const response = await model.invoke([classificationPrompt]);
+  const isComplex = response.content.toString().trim().toUpperCase() === 'COMPLEX';
   
-  console.log(`Query classification: ${isComplex ? 'COMPLEX' : 'SIMPLE'}`); // 70: Log classification result
+  console.log(`Query classification: ${isComplex ? 'COMPLEX' : 'SIMPLE'}`);
   
-  return {                                                       // 72: Return state updates
-    isComplex,                                                   // 73: Set complexity flag
-    currentStep: 0                                               // 74: Reset step counter
+  return {
+    isComplex
   };
 }
 
-// handles simple queries with direct model responses
 async function simpleResponse(state: typeof PlanAnnotation.State) {
-  console.log('Handling simple query directly');                // 79: Log simple handling mode
+  console.log('Handling simple query directly');
   
-  const response = await model.invoke(state.messages);          // 81: Send all messages to model for response
+  const response = await model.invoke(state.messages);
   
-  return {                                                      // 83: Return state updates
-    messages: [response]                                        // 84: Add model response to message history
+  return {
+    messages: [response]
   };
 }
 
-// creates detailed execution plan for complex queries
 async function createPlan(state: typeof PlanAnnotation.State) {
-  const lastMessage = state.messages[state.messages.length - 1]; // 89: Get user's complex query
+  const lastMessage = state.messages[state.messages.length - 1];
   
   const planningPrompt = new HumanMessage(`
 Create a step-by-step plan to answer this complex query:
@@ -142,110 +119,99 @@ Format your response as:
 Use a maximum of 7 steps.
 `);
 
-  const response = await model.invoke([planningPrompt]); // 106: Ask model to create plan
-  const planText = response.content.toString();          // 107: Extract plan text
+  const response = await model.invoke([planningPrompt]);
+  const planText = response.content.toString();
   
-  // Extract steps from the response
-  const steps = planText.split('\n')                     // 110: Split response into lines
-    .filter(line => /^\d+\./.test(line.trim()))          // 111: Keep only numbered lines
-    .map(step => step.replace(/^\d+\.\s*/, '').trim());  // 112: Remove numbering, keep step text
+  const steps = planText.split('\n')
+    .filter(line => /^\d+\./.test(line.trim()))
+    .map(step => step.replace(/^\d+\.\s*/, '').trim());
   
-  console.log('Generated plan with', steps.length, 'steps'); // 114: Log plan summary
-  steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`)); // 115: Log each step
+  console.log('Generated plan with', steps.length, 'steps');
+  steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
   
   return {
-    plan: steps,                                         // 118: Store extracted steps
-    messages: [new AIMessage(`I'll handle this complex query step by step:\n\n${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nLet me start working through these steps...`)] // 119: Create response message
+    plan: steps,
+    messages: [new AIMessage(`I'll handle this complex query step by step:\n\n${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nLet me start working through these steps...`)]
   };
 }
 
-// control flow logic - determines next workflow step
 function shouldContinue(state: typeof PlanAnnotation.State) {
-  if (!state.isComplex) {                             // 124: If query classified as simple
-    return 'simple';                                  // 125: Route to simple response handler
+  if (!state.isComplex) {
+    return 'simple';
   }
-  if (!state.plan || state.plan.length === 0) {      // 127: If no plan exists yet
-    return 'createPlan';                              // 128: Route to plan creation
+  if (!state.plan || state.plan.length === 0) {
+    return 'createPlan';
   }
-  return 'end';                                       // 130: Otherwise finish workflow
+  return 'end';
 }
-
-// workflow graph construction - defines agent's decision flow
 
 /*
           __start__
               |
               v
-        ┌─────────────-┐
-        │   classify   │
-        │(classifyQuery)
-        └─────-┬───────┘
-               │
-        shouldContinue()
-          /         \
-        v             v
-  ┌──────────--┐  ┌──────────--┐
-  │   simple   │  │ createPlan │
-  │(simpleResp)│  |(createPlan)│
-  └────┬────--─┘  └────┬─────--┘
-       │               │
-       v               v
-     __end__        __end__
+        ┌─────────────┐
+        │   classify  │
+        └─────┬───────┘
+              │
+       shouldContinue()
+         /         \
+       v             v
+ ┌─────────┐  ┌──────────┐
+ │  simple │  │createPlan│
+ └────┬────┘  └────┬─────┘
+      │            │
+      v            v
+   __end__      __end__
 */
 
-const workflow = new StateGraph(PlanAnnotation)       // 133: Create graph with state schema
-  .addNode('classify', classifyQuery)                  // 134: Add query classification node
-  .addNode('simple', simpleResponse)                   // 135: Add simple response handler
-  .addNode('createPlan', createPlan)                   // 136: Add plan creation node
-  .addEdge('__start__', 'classify')                    // 137: Start with classification
-  .addConditionalEdges('classify', shouldContinue)     // 138: Route based on complexity
-  .addEdge('simple', '__end__')                        // 139: Simple queries end here
-  .addEdge('createPlan', '__end__');                   // 140: Planning ends workflow
+const workflow = new StateGraph(PlanAnnotation)
+  .addNode('classify', classifyQuery)
+  .addNode('simple', simpleResponse)
+  .addNode('createPlan', createPlan)
+  .addEdge('__start__', 'classify')
+  .addConditionalEdges('classify', shouldContinue)
+  .addEdge('simple', '__end__')
+  .addEdge('createPlan', '__end__');
 
-const app = workflow.compile();                        // 142: Compile graph into executable
+const app = workflow.compile();
 
-// agent execution function - main entry point for queries
 async function runAgent(userInput: string) {
-  console.log(`\nUser: ${userInput}`);                 // 145: Log user input
+  console.log(`\nUser: ${userInput}`);
   
-  const initialState = {                               // 147: Set up initial state
-    messages: [new HumanMessage(userInput)],           // 148: Wrap input as message
+  const initialState = {
+    messages: [new HumanMessage(userInput)],
     isComplex: false,
-    plan: [],                                          // 149: Empty plan initially
-    currentStep: 0                                     // 150: Start at step 0
+    plan: []
   };
   
-  const result = await app.invoke(initialState);       // 153: Execute workflow
-  const lastMessage = result.messages[result.messages.length - 1]; // 154: Get final response
+  const result = await app.invoke(initialState);
+  const lastMessage = result.messages[result.messages.length - 1];
   
-  console.log(`Agent: ${lastMessage.content}`);        // 156: Log agent response
+  console.log(`Agent: ${lastMessage.content}`);
   
-  return lastMessage.content;                          // 158: Return response content
+  return lastMessage.content;
 }
 
-// main entry point & testing - validates agent functionality
-async function main() {                                // 161: Main execution function
-  if (!process.env.ANTHROPIC_API_KEY) {               // 162: Check for API key
-    console.error('Error: Please set your ANTHROPIC_API_KEY in the .env file'); // 163: Error message
-    process.exit(1);                                   // 164: Exit with error code
+async function main() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('Error: Please set your ANTHROPIC_API_KEY in the .env file');
+    process.exit(1);
   }
   
-  console.log('Starting Agent...');                    // 167: Startup message
+  console.log('Starting Agent...');
   
-  try {                                                // 169: Error handling wrapper
-    // Simple queries                                  // 170: Test simple cases
-    await runAgent('Hello! Can you tell me what you are?'); // 171: Greeting test
-    await runAgent('What is 2 + 2?');                 // 172: Basic math test
+  try {
+    await runAgent('Hello! Can you tell me what you are?');
+    await runAgent('What is 2 + 2?');
     
-    // Complex queries                                 // 174: Test complex cases
-    await runAgent('Help me plan a comprehensive marketing strategy for a new tech startup'); // 175: Complex planning
-    await runAgent('How can I optimize my team\'s workflow for better productivity and collaboration?'); // 176: Multi-step query
+    await runAgent('Help me plan a comprehensive marketing strategy for a new tech startup');
+    await runAgent('How can I optimize my team\'s workflow for better productivity and collaboration?');
     
-  } catch (error) {                                   // 178: Catch execution errors
-    console.error('Error running agent:', error);     // 179: Log error details
+  } catch (error) {
+    console.error('Error running agent:', error);
   }
 }
 
-if (require.main === module) {                        // 183: Check if run directly
-  main();                                              // 184: Execute main function
+if (require.main === module) {
+  main();
 }
