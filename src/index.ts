@@ -46,6 +46,10 @@ const PlanAnnotation = Annotation.Root({
     reducer: (x, y) => y ?? x // if not complex then stays False otherwise True
   }),
   
+  plan: Annotation<string[]>({
+    reducer: (prev = [], next = []) => next.length > 0 ? next : prev // replace plan when provided
+  }),
+  
   // parallel task execution state fields
   tasks: Annotation<Task[]>({
     reducer: (prev = [], next = []) => {
