@@ -34,6 +34,10 @@ const PlanAnnotation = Annotation.Root({
     reducer: (prev = [], next = []) => next.length > 0 ? next : prev
   }),
   
+  currentStep: Annotation<number>({
+    reducer: (x, y) => y ?? x
+  }),
+  
   tasks: Annotation<Task[]>({
     reducer: (prev = [], next = []) => {
       if (next.length === 0) return prev;
@@ -131,7 +135,33 @@ Use a maximum of 7 steps.
   
   return {
     plan: steps,
+    currentStep: 0,
     messages: [new AIMessage(`I'll handle this complex query step by step:\n\n${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nLet me start working through these steps...`)]
+  };
+}
+
+async function executeStep(state: typeof PlanAnnotation.State) {
+  const currentStepIndex = state.currentStep || 0;
+  const currentStepText = state.plan[currentStepIndex];
+  
+  console.log(`Executing step ${currentStepIndex + 1}: ${currentStepText}`);
+  
+  const executionPrompt = new HumanMessage(`
+Execute this specific step from the plan:
+
+Step: "${currentStepText}"
+
+Previous context from earlier steps:
+${state.messages.slice(-3).map(m => m.content).join('\n\n')}
+
+Provide a detailed response for this step only. Be thorough and actionable.
+`);
+
+  const response = await model.invoke([executionPrompt]);
+  
+  return {
+    currentStep: currentStepIndex + 1,
+    messages: [new AIMessage(`Step ${currentStepIndex + 1} completed: ${response.content}`)]
   };
 }
 
@@ -162,6 +192,27 @@ function shouldContinue(state: typeof PlanAnnotation.State) {
       │            │
       v            v
    __end__      __end__
+*/
+
+/*
+Task-based: executes the entire plan in one function call, converting all steps to Task objects and running them with dependency management.
+
+Streaming/Iterative: Executes one step at a time, returning control to the graph after each step,using conditional edges to decide whether to continue or stop.
+
+The latter would be much better for HITL integration.
+  - Natural pause points - After each step, control returns to the graph where you can add human approval nodes
+  - Incremental feedback - Humans can see progress and intervene at any step
+  - Plan modification - Can adjust remaining steps based on human input or step results
+  - Granular control - Easy to add conditional edges for human approval/rejection
+
+Former problems for HITL:
+  - All-or-nothing - Entire plan executes in one function call
+  - No intervention points - Hard to pause mid-execution for human input
+  - Batch processing - Human sees only final results, not intermediate steps
+
+
+WORKFLOW: 
+classify → createPlan → executeStep → shouldContinue → executeStep → ... → end
 */
 
 const workflow = new StateGraph(PlanAnnotation)
@@ -204,8 +255,8 @@ async function main() {
     await runAgent('Hello! Can you tell me what you are?');
     await runAgent('What is 2 + 2?');
     
-    await runAgent('Help me plan a comprehensive marketing strategy for a new tech startup');
-    await runAgent('How can I optimize my team\'s workflow for better productivity and collaboration?');
+    await runAgent('Write a Python function that calculates the factorial of a number');
+    await runAgent('Explain the differences between REST and GraphQL APIs with examples');
     
   } catch (error) {
     console.error('Error running agent:', error);
