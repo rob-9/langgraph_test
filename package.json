@@ -9,7 +9,6 @@
     "start": "node dist/index.js",
     "test": "node dist/test.js"
   },
-  "keywords": ["langgraph", "langchain", "claude", "agent", "typescript"],
   "author": "",
   "license": "MIT",
   "devDependencies": {
@@ -21,6 +20,7 @@
     "@langchain/anthropic": "^0.3.0",
     "@langchain/core": "^0.3.0",
     "@langchain/langgraph": "^0.2.0",
+    "@langchain/langgraph-sdk": "^0.1.0",
     "dotenv": "^16.0.0"
   }
 }
