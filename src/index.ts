@@ -173,7 +173,6 @@ async function main() {
   try {
     await runAgent('Hello! Can you tell me what you are?');
     await runAgent('Hello. please get Amanda salary.');
-    await runAgent('Write a Python function that calculates the factorial of a number');
     await runAgent('Analyze our quarterly budget and create a financial report');
     
   } catch (error) {

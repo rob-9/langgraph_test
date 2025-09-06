@@ -14,14 +14,14 @@ export async function classifyQuery(state: typeof PlanAnnotation.State) {
   const lastMessage = state.messages[state.messages.length - 1];
   
   const classificationPrompt = new HumanMessage(`
-Analyze this user query and determine if it's SIMPLE or COMPLEX:
+    Analyze this user query and determine if it's SIMPLE or COMPLEX:
 
-Query: "${lastMessage.content}"
+    Query: "${lastMessage.content}"
 
-A SIMPLE query is one that can be answered directly with existing knowledge (greetings, definitions, basic facts) that does not need a workflow to answer. 
-A COMPLEX query requires multiple steps, research, planning, or problem-solving to generate a satisfactory response.
+    A SIMPLE query is one that can be answered directly with existing knowledge (greetings, definitions, basic facts) that does not need a workflow to answer. 
+    A COMPLEX query requires multiple steps, research, planning, or problem-solving to generate a satisfactory response.
 
-Respond with only "SIMPLE" or "COMPLEX":
+    Respond with only "SIMPLE" or "COMPLEX":
 `);
 
   const response = await model.invoke([classificationPrompt]);
@@ -65,44 +65,44 @@ export async function createPlan(state: typeof PlanAnnotation.State) {
     .join('\n');
     
   const agentContext = `
-HR AGENT CONTEXT:
-- Has access to full GraphQL schema for employee and financial data
-- Returns actual data when function exists for the task, otherwise random numbers
-- Can query employees, plans, transactions, financial metrics, etc.
+    HR AGENT CONTEXT:
+    - Has access to full GraphQL schema for employee and financial data
+    - Returns actual data when function exists for the task, otherwise random numbers
+    - Can query employees, plans, transactions, financial metrics, etc.
 
-FULL GRAPHQL SCHEMA:
-${HR_GRAPHQL_SCHEMA}
+    FULL GRAPHQL SCHEMA:
+    ${HR_GRAPHQL_SCHEMA}
 
-FPA AGENT CONTEXT:
-- FINANCIAL TASKS ONLY: revenue, profit, budgets, burn rate, financial metrics, reports
-- Cannot handle: coding, general analysis, non-financial tasks
-- Has access to financial queries: getBurnRate, getRevenue, profitMargin, ebitda, etc.
+    FPA AGENT CONTEXT:
+    - FINANCIAL TASKS ONLY: revenue, profit, budgets, burn rate, financial metrics, reports
+    - Cannot handle: coding, general analysis, non-financial tasks
+    - Has access to financial queries: getBurnRate, getRevenue, profitMargin, ebitda, etc.
 `;
     
   const planningPrompt = new HumanMessage(`
-Create a concise, actionable plan to complete this task with specific agent assignments:
+    Create a concise, actionable plan to complete this task with specific agent assignments:
 
-Query: "${lastMessage.content}"
+    Query: "${lastMessage.content}"
 
-${agentContext}
+    ${agentContext}
 
-Available agents and their capabilities:
-${agentCapabilities}
+    Available agents and their capabilities:
+    ${agentCapabilities}
 
-Provide 2-4 specific, executable steps that directly accomplish the task.
-For each step, specify which agent should handle it based on their capabilities.
+    Provide 2-4 specific, executable steps that directly accomplish the task.
+    For each step, specify which agent should handle it based on their capabilities.
 
-IMPORTANT: 
-- HR: Use for employee data, salary queries, HR-related tasks
-- FPA: Use ONLY for financial analysis, budgets, revenue, financial reports
-- zAI: Use for general tasks, coordination, non-financial analysis
+    IMPORTANT: 
+    - HR: Use for employee data, salary queries, HR-related tasks
+    - FPA: Use ONLY for financial analysis, budgets, revenue, financial reports
+    - zAI: Use for general tasks, coordination, non-financial analysis
 
-Format your response as:
-1. [Agent: AGENT_NAME] - [Step description]
-2. [Agent: AGENT_NAME] - [Step description]
-3. [Agent: AGENT_NAME] - [Step description]
+    Format your response as:
+    1. [Agent: AGENT_NAME] - [Step description]
+    2. [Agent: AGENT_NAME] - [Step description]
+    3. [Agent: AGENT_NAME] - [Step description]
 
-Maximum 4 steps. Each step should produce a concrete deliverable.
+    Maximum 4 steps. Each step should produce a concrete deliverable.
 `);
 
   const response = await model.invoke([planningPrompt]);
@@ -161,15 +161,15 @@ export async function executeStep(state: typeof PlanAnnotation.State) {
   }
   
   const executionPrompt = new HumanMessage(`
-Execute this specific step from the plan:
+    Execute this specific step from the plan:
 
-Step: "${currentStepText}"
+    Step: "${currentStepText}"
 
-Previous context from earlier steps:
-${state.messages.slice(-3).map(m => m.content).join('\n\n')}
+    Previous context from earlier steps:
+    ${state.messages.slice(-3).map(m => m.content).join('\n\n')}
 
-Rate your confidence (0-100) in completing this step successfully, then provide your response.
-Format: "Confidence: [score]\n\n[your response]"
+    Rate your confidence (0-100) in completing this step successfully, then provide your response.
+    Format: "Confidence: [score]\n\n[your response]"
 `);
 
   const response = await model.invoke([executionPrompt]);
@@ -295,18 +295,18 @@ export async function aggregateResults(state: typeof PlanAnnotation.State) {
   // Aggregating results
   
   const aggregationPrompt = new HumanMessage(`
-You are zAI, the orchestrator agent. You delegated a complex task to various specialized agents and received their responses.
+    You are zAI, the orchestrator agent. You delegated a complex task to various specialized agents and received their responses.
 
-Original user query: "${originalQuery}"
+    Original user query: "${originalQuery}"
 
-Plan steps executed: 
-${planSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+    Plan steps executed: 
+    ${planSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
 
-Agent responses received:
-${agentResponses.map((response, i) => `- ${response}`).join('\n')}
+    Agent responses received:
+    ${agentResponses.map((response, i) => `- ${response}`).join('\n')}
 
-Please provide a comprehensive final answer to the user's original query by synthesizing all agent responses. 
-Be concise but complete, and acknowledge which agents contributed to the solution.
+    Please provide a comprehensive final answer to the user's original query by synthesizing all agent responses. 
+    Be concise but complete, and acknowledge which agents contributed to the solution.
 `);
 
   const response = await model.invoke([aggregationPrompt]);
