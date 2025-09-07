@@ -1,6 +1,6 @@
 import { Annotation } from '@langchain/langgraph';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import { Task, AgentMessage } from './types';
+import { AgentTask, AgentMessage } from './types';
 
 export const PlanAnnotation = Annotation.Root({
   messages: Annotation<(HumanMessage | AIMessage)[]>({
@@ -47,7 +47,7 @@ export const PlanAnnotation = Annotation.Root({
     reducer: (prev = [], next = []) => prev.concat(next)
   }),
   
-  tasks: Annotation<Task[]>({
+  tasks: Annotation<AgentTask[]>({
     reducer: (prev = [], next = []) => {
       if (next.length === 0) return prev;
       const merged = [...prev];
@@ -85,6 +85,24 @@ export const PlanAnnotation = Annotation.Root({
   }),
   
   agentResponses: Annotation<{[taskId: string]: string}>({
+    reducer: (prev = {}, next = {}) => ({ ...prev, ...next })
+  }),
+  
+  // SDK integration fields
+  threadId: Annotation<string>({
+    reducer: (x, y) => y ?? x
+  }),
+  
+  runId: Annotation<string>({
+    reducer: (x, y) => y ?? x
+  }),
+  
+  // Enhanced task state with SDK features
+  taskCheckpoints: Annotation<{[taskId: string]: any}>({
+    reducer: (prev = {}, next = {}) => ({ ...prev, ...next })
+  }),
+  
+  taskInterrupts: Annotation<{[taskId: string]: any[]}>({
     reducer: (prev = {}, next = {}) => ({ ...prev, ...next })
   })
 });

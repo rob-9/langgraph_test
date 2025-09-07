@@ -291,8 +291,17 @@ export async function aggregateResults(state: typeof PlanAnnotation.State) {
   const originalQuery = state.messages[0].content.toString();
   const agentResponses = Object.values(state.agentResponses || {});
   const planSteps = state.plan || [];
+  const completedTasks = state.tasks || [];
   
-  // Aggregating results
+  // Enhanced result aggregation with SDK task data
+  const taskSummary = completedTasks.map(task => ({
+    agent: task.assignedAgent,
+    description: task.description,
+    result: task.result,
+    duration: task.endTime && task.startTime ? 
+      new Date(task.endTime).getTime() - new Date(task.startTime).getTime() : 0,
+    status: task.error ? 'failed' : 'completed'
+  }));
   
   const aggregationPrompt = new HumanMessage(`
     You are zAI, the orchestrator agent. You delegated a complex task to various specialized agents and received their responses.
@@ -301,6 +310,11 @@ export async function aggregateResults(state: typeof PlanAnnotation.State) {
 
     Plan steps executed: 
     ${planSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+    Task execution summary:
+    ${taskSummary.map(task => 
+      `- ${task.agent}: ${task.description} -> ${task.result} (${task.status}, ${task.duration}ms)`
+    ).join('\n')}
 
     Agent responses received:
     ${agentResponses.map((response, i) => `- ${response}`).join('\n')}
@@ -311,7 +325,15 @@ export async function aggregateResults(state: typeof PlanAnnotation.State) {
 
   const response = await model.invoke([aggregationPrompt]);
   
+  // Mark all tasks as completed
+  const updatedTasks = completedTasks.map(task => ({
+    ...task,
+    result: task.result || 'Completed as part of aggregation'
+  }));
+  
   return {
+    allTasksCompleted: true,
+    tasks: updatedTasks,
     messages: [new AIMessage(`[zAI Final Result] ${response.content}`)]
   };
 }

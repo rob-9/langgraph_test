@@ -1,19 +1,23 @@
 import { AIMessage } from '@langchain/core/messages';
-import { AgentMessage, AgentResponse, Task } from './types';
+import { AgentMessage, AgentResponse, AgentTask } from './types';
 import { AGENT_CONFIGS, SYSTEM_CONFIG } from './config';
 import { PlanAnnotation } from './state';
-import { executeStep } from './nodes';
+import { getSDKClient, LangGraphSDKClient } from './sdk-client';
 
-// Message passing system for agent communication
-class MessageBus {
-  private static instance: MessageBus;
-  private messages: AgentMessage[] = [];
+// Enhanced agent communication using SDK
+class SDKMessageBus {
+  private static instance: SDKMessageBus;
+  private sdkClient: LangGraphSDKClient;
 
-  static getInstance(): MessageBus {
-    if (!MessageBus.instance) {
-      MessageBus.instance = new MessageBus();
+  static getInstance(): SDKMessageBus {
+    if (!SDKMessageBus.instance) {
+      SDKMessageBus.instance = new SDKMessageBus();
     }
-    return MessageBus.instance;
+    return SDKMessageBus.instance;
+  }
+
+  constructor() {
+    this.sdkClient = getSDKClient();
   }
 
   async sendMessage(message: Omit<AgentMessage, 'id' | 'timestamp'>): Promise<string> {
@@ -23,9 +27,18 @@ class MessageBus {
       ...message
     };
     
-    this.messages.push(fullMessage);
-    // Mock agent response - all agents respond with "Hi" for now
-    return await this.processAgentResponse(fullMessage);
+    // Store message in SDK store
+    await this.sdkClient.storeAgentMessage(fullMessage);
+    
+    // Process agent response
+    const response = await this.processAgentResponse(fullMessage);
+    
+    // Store response
+    if (fullMessage.taskId) {
+      await this.sdkClient.storeAgentResponse(fullMessage.taskId, fullMessage.to, response);
+    }
+    
+    return response;
   }
 
   private async processAgentResponse(message: AgentMessage): Promise<string> {
@@ -40,7 +53,7 @@ class MessageBus {
       case 'HR':
         // Check if this looks like a function call that should return data
         if (/(get|fetch|find|query|retrieve|salary|employee|data)/i.test(message.content)) {
-          const randomValue = Math.floor(Math.random() * 100000) + 50000; // Random salary between 50k-150k
+          const randomValue = Math.floor(Math.random() * 100000) + 50000;
           return `HR Agent: GraphQL query executed. Result: ${randomValue}`;
         }
         return `HR Agent: Hi from ${targetAgent.name}`;
@@ -57,8 +70,8 @@ class MessageBus {
     }
   }
 
-  getMessageHistory(): AgentMessage[] {
-    return [...this.messages];
+  async getMessageHistory(agentId?: string): Promise<AgentMessage[]> {
+    return await this.sdkClient.getAgentMessages(agentId);
   }
 }
 
@@ -93,18 +106,39 @@ export async function delegateTask(agentId: string, taskDescription: string, tas
     return `Error: Agent ${agentId} not found`;
   }
   
-  // Delegating task to agent
+  const sdkClient = getSDKClient();
+  const messageBus = SDKMessageBus.getInstance();
   
-  const messageBus = MessageBus.getInstance();
+  // Create AgentTask using SDK ThreadTask structure
+  const task: AgentTask = {
+    id: taskId || `task_${Date.now()}_${agentId}`,
+    name: `${agentId}_task`,
+    assignedAgent: agentId,
+    description: taskDescription,
+    startTime: new Date(),
+    result: undefined,
+    error: null,
+    interrupts: [],
+    checkpoint: null,
+    state: null
+  };
+  
+  // Store task in SDK
+  await sdkClient.storeTask(agentId, task);
   
   // Send message to agent
   const response = await messageBus.sendMessage({
     from: 'zAI',
     to: agentId,
     content: taskDescription,
-    taskId: taskId,
+    taskId: task.id,
     messageType: 'task_delegation'
   });
+  
+  // Update task with completion
+  task.result = response;
+  task.endTime = new Date();
+  await sdkClient.storeTask(agentId, task);
   
   return response;
 }
@@ -112,15 +146,39 @@ export async function delegateTask(agentId: string, taskDescription: string, tas
 export async function coordinateAgents(state: typeof PlanAnnotation.State) {
   const currentStepIndex = state.currentStep || 0;
   const currentStepText = state.plan[currentStepIndex];
+  const sdkClient = getSDKClient();
   
-  // Coordinating step execution
+  // Initialize thread if not exists
+  let threadId = state.threadId;
+  if (!threadId) {
+    const thread = await sdkClient.createThread({
+      step: currentStepIndex,
+      plan: state.plan
+    });
+    threadId = thread.thread_id;
+  }
   
   // Determine which agent should handle this task
   const responsibleAgent = determineResponsibleAgent(currentStepText);
   
-  // Always delegate through message passing system
+  // Create and delegate task
   const taskId = `task_${currentStepIndex}_${Date.now()}`;
   const response = await delegateTask(responsibleAgent, currentStepText, taskId);
+  
+  // Create enhanced AgentTask
+  const agentTask: AgentTask = {
+    id: taskId,
+    name: `step_${currentStepIndex}_${responsibleAgent}`,
+    assignedAgent: responsibleAgent,
+    description: currentStepText,
+    result: response,
+    error: null,
+    interrupts: [],
+    checkpoint: null,
+    state: null,
+    startTime: new Date(),
+    endTime: new Date()
+  };
   
   const agentMessage: AgentMessage = {
     id: `msg_${Date.now()}`,
@@ -132,11 +190,20 @@ export async function coordinateAgents(state: typeof PlanAnnotation.State) {
     messageType: 'task_delegation'
   };
   
+  // Update thread state
+  await sdkClient.updateThreadState(threadId, {
+    currentStep: currentStepIndex + 1,
+    lastCompletedTask: agentTask
+  });
+  
   return {
+    threadId,
     currentStep: currentStepIndex + 1,
     currentAgent: responsibleAgent,
+    tasks: [agentTask],
     agentMessages: [agentMessage],
     agentResponses: { [taskId]: response },
+    taskCheckpoints: { [taskId]: { completed: true, timestamp: new Date() } },
     messages: [new AIMessage(`Step ${currentStepIndex + 1} - Delegated to ${AGENT_CONFIGS[responsibleAgent].name}: ${response}`)]
   };
 }

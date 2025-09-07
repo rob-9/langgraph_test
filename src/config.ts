@@ -14,7 +14,16 @@ export interface AgentConfig {
 
 export const SYSTEM_CONFIG: SystemConfig = {
   use_pae: true,        // Most agents use plan-and-execute by default
-  enable_hitl: false    // Disabled for testing - no human intervention required
+  enable_hitl: process.env.ENABLE_HITL === 'true' || false    // Configurable via environment
+};
+
+// SDK Configuration for enhanced task tracking
+export const SDK_CONFIG = {
+  apiUrl: process.env.LANGGRAPH_API_URL,
+  apiKey: process.env.LANGGRAPH_API_KEY || process.env.LANGSMITH_API_KEY,
+  enablePersistence: process.env.ENABLE_SDK_PERSISTENCE === 'true' || false,
+  timeout: 30000,
+  maxRetries: 3
 };
 
 export const AGENT_CONFIGS: Record<string, AgentConfig> = {

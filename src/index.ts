@@ -18,6 +18,7 @@ import {
   shouldContinue 
 } from './nodes';
 import { coordinateAgents } from './agents';
+import { getSDKClient } from './sdk-client';
 
 /*
 Configuration-Driven Multi-Agent Workflow:
@@ -123,6 +124,15 @@ const app = workflow.compile();
 async function runAgent(userInput: string) {
   console.log(`\n=== Query: ${userInput} ===`);
   
+  // Initialize SDK client for enhanced task tracking
+  const sdkClient = getSDKClient();
+  
+  // Create thread for persistent task tracking
+  const thread = await sdkClient.createThread({
+    query: userInput,
+    startTime: new Date().toISOString()
+  });
+  
   const initialState = {
     messages: [new HumanMessage(userInput)],
     isComplex: false,
@@ -130,7 +140,11 @@ async function runAgent(userInput: string) {
     currentAgent: 'zAI',
     agentMessages: [],
     delegatedTasks: {},
-    agentResponses: {}
+    agentResponses: {},
+    tasks: [],
+    threadId: thread.thread_id,
+    taskCheckpoints: {},
+    taskInterrupts: {}
   };
   
   const stream = await app.stream(initialState);
@@ -141,7 +155,7 @@ async function runAgent(userInput: string) {
     const nodeResult = step[nodeName];
     finalResult = nodeResult;
     
-    // Only show essential workflow steps
+    // Enhanced logging with task tracking information
     if (nodeName === 'createPlan' || nodeName === 'aggregateResults' || nodeName === 'simple' || nodeName === 'directAgentExecution') {
       if (nodeResult.messages && nodeResult.messages.length > 0) {
         const lastMessage = nodeResult.messages[nodeResult.messages.length - 1];
@@ -149,11 +163,22 @@ async function runAgent(userInput: string) {
       }
     }
     
-    // Show agent task responses
+    // Show agent task responses with enhanced tracking
     if (nodeName === 'coordinateAgents') {
       if (nodeResult.messages && nodeResult.messages.length > 0) {
         const lastMessage = nodeResult.messages[nodeResult.messages.length - 1];
         console.log(`${lastMessage.content}`);
+      }
+      
+      // Show task execution details
+      if (nodeResult.tasks && nodeResult.tasks.length > 0) {
+        const task = nodeResult.tasks[0];
+        console.log(`  └─ Task: ${task.id} (${task.assignedAgent}) - ${task.result ? 'Completed' : 'In Progress'}`);
+        
+        if (task.startTime && task.endTime) {
+          const duration = new Date(task.endTime).getTime() - new Date(task.startTime).getTime();
+          console.log(`  └─ Duration: ${duration}ms`);
+        }
       }
     }
   }
@@ -167,13 +192,26 @@ async function main() {
     process.exit(1);
   }
   
-  console.log('Multi-Agent System Started');
   console.log('Agents: zAI (orchestrator), HR (leaf), FPA (leaf)');
+  
+  // Initialize SDK client and cleanup old data
+  const sdkClient = getSDKClient();
+  await sdkClient.cleanupExpiredData();
   
   try {
     await runAgent('Hello! Can you tell me what you are?');
     await runAgent('Hello. please get Amanda salary.');
     await runAgent('Analyze our quarterly budget and create a financial report');
+    
+    // Optional: Show task tracking summary
+    console.log('\nTask Tracking Summary:');
+    const hrTasks = await sdkClient.getAgentTasks('HR');
+    const fpaTasks = await sdkClient.getAgentTasks('FPA');
+    const zaiTasks = await sdkClient.getAgentTasks('zAI');
+    
+    console.log(`  HR Agent: ${hrTasks.length} tasks completed`);
+    console.log(`  FPA Agent: ${fpaTasks.length} tasks completed`);
+    console.log(`  zAI Agent: ${zaiTasks.length} tasks completed`);
     
   } catch (error) {
     console.error('Error running agent:', error);

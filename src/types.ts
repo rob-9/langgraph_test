@@ -1,22 +1,26 @@
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import type { ThreadTask, Thread, ThreadState, Run, Interrupt } from '@langchain/langgraph-sdk';
 
-export interface Task {
-  id: string;
-  description: string;
-  dependencies: string[];
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  result?: string;
+// Re-export SDK types for convenience
+export type { ThreadTask, Thread, ThreadState, Run, Interrupt };
+
+// Enhanced agent task with SDK ThreadTask as base
+export interface AgentTask extends ThreadTask {
+  assignedAgent?: string;
+  dependencies?: string[];
+  description?: string;
   startTime?: Date;
   endTime?: Date;
-  assignedAgent?: string; // Agent assigned to execute this task
 }
 
 export interface PlanState {
   messages: (HumanMessage | AIMessage)[];
   isComplex: boolean;
-  tasks: Task[];
+  tasks: AgentTask[];
   allTasksCompleted: boolean;
   executionResults: string[];
+  threadId?: string;
+  runId?: string;
 }
 
 export interface AgentMessage {
@@ -35,4 +39,11 @@ export interface AgentResponse {
   response: string;
   success: boolean;
   timestamp: Date;
+}
+
+// SDK Client configuration
+export interface SDKConfig {
+  apiUrl?: string;
+  apiKey?: string;
+  enablePersistence?: boolean;
 }
