@@ -10,7 +10,6 @@ import {
   simpleResponse, 
   directAgentExecution,
   createPlan, 
-  executeStep, 
   stepApproval, 
   stepClarification, 
   stepContext,
@@ -21,16 +20,16 @@ import { coordinateAgents } from './agents';
 import { getSDKClient } from './sdk-client';
 
 /*
-Configuration-Driven Multi-Agent Workflow:
+Configuration-Driven Multi-Agent Workflow with LangGraph SDK Integration:
 
 SYSTEM_CONFIG:
 - use_pae: true (global PAE setting) 
 - enable_hitl: false (HITL disabled for testing)
 
 AGENTS:
-- zAI: Orchestrator (use_pae=true, isLeafAgent=false)
-- HR:  Leaf agent (use_pae=false, isLeafAgent=true) - Direct execution only  
-- FPA: Leaf agent (use_pae=true, isLeafAgent=true) - Full PAE workflow
+- zAI: Orchestrator (coordination & aggregation)
+- HR:  Employee/salary data (GraphQL schema access)
+- FPA: Financial analysis & reporting
 
 WORKFLOW GRAPH:
 
@@ -38,61 +37,89 @@ WORKFLOW GRAPH:
                         |
                         v
                   ┌─────────────┐
-                  │   classify  │ (skipped for HR: use_pae=false)
+                  │   classify  │ (Simple vs Complex)
                   └─────┬───────┘
                         │
                  shouldContinue()
                    /         \
                  v             v
-           ┌─────────┐  ┌──────────┐
-           │  simple │  │createPlan│ (with agent assignments)
-           └────┬────┘  └────┬─────┘
-                │            │
-                v      shouldContinue()
-             __end__         │
-                             v
-                    ┌────────────────┐◄─┐
-                    │coordinateAgents│  │ (message passing)
-                    └────────┬───────┘  │
-                             │          │
-                      (agent delegation) │
-                        /    |    \     │
-                      v      v      v   │
-              ┌──────────┐ ┌─────┐ ┌─────┐│
-              │zAI (Top) │ │ HR  │ │ FPA ││
-              │Planner   │ │Leaf │ │Leaf ││
-              └──────────┘ └─────┘ └─────┘│
-                             │          │
-                      All respond "Hi"   │
-                             │          │
-                             v          │
-                      shouldContinue()  │
-                             │          │
-                    (HITL disabled)     │
-                             │          │
-                             └──────────┘
-                             │
-                             v
-                      shouldContinue()
-                        /         \
-                      v             v
-              ┌─────────────────┐   (next step)
-              │ aggregateResults│
-              │     (zAI)       │
-              └─────┬───────────┘
-                    │
-                    v
-                 __end__
+           ┌─────────┐    ┌──────────┐
+           │  simple │    │shouldContinue│
+           └────┬────┘    └────┬─────┘
+                │              │
+                v         HR queries? / Plan needed?
+             __end__           |              |
+                            v              v
+                  ┌─────────────────┐  ┌──────────┐
+                  │directAgentExec  │  │createPlan│
+                  │(HR bypass PAE)  │  │(steps+agents)│
+                  └────┬────────────┘  └────┬─────┘
+                       │                    │
+                       v             shouldContinue()
+                    __end__                │
+                                          v
+                                shouldContinue()◄─┐
+                                 (HITL enabled?)  │
+                                    /   |   \     │
+                     needsApproval?/    |    \waitingForHuman?
+                                 v      |      v  │
+                          ┌─────────────┐  ┌──────────────┐│
+                          │stepApproval │  │stepClarification││
+                          │(approve/    │  │(continue/    ││
+                          │modify/skip) │  │replan)       ││
+                          └─────┬───────┘  └──────┬───────┘│
+                                │                 │        │
+                                └────┐    ┌───────┘        │
+                                     │    │                │
+                              needsContext?                │
+                                     │    │                │
+                                     v    v                │
+                              ┌─────────────────┐          │
+                              │   stepContext   │          │
+                              │(collect context)│          │
+                              └─────┬───────────┘          │
+                                    │                      │
+                             (all HITL resolved)           │
+                                    │                      │
+                                    v                      │
+                             ┌────────────────┐            │
+                             │coordinateAgents│            │
+                             └────────┬───────┘            │
+                                      │                    │
+                               (task delegation)           │
+                                 /    |    \               │
+                               v      v      v             │
+                       ┌──────────┐ ┌─────┐ ┌─────┐        │
+                       │   zAI    │ │ HR  │ │ FPA │        │
+                       │(coord)   │ │Data │ │Fin  │        │
+                       └──────────┘ └─────┘ └─────┘        │
+                                      │                    │
+                               Agent responses             │
+                                      │                    │
+                                      v                    │
+                               shouldContinue()            │
+                                (next step?)               │
+                                      │                    │
+                                      └────────────────────┘
+                                      │
+                           (all steps complete)
+                                      │
+                                      v
+                             ┌─────────────────┐
+                             │ aggregateResults│
+                             │  (zAI synthesis)│
+                             └─────┬───────────┘
+                                   │
+                                   v
+                                __end__
 
-FINAL AGGREGATION:
-- zAI synthesizes all agent responses
-- Creates comprehensive final answer
-- Acknowledges contributing agents
-
-MESSAGE PASSING: 
-- MessageBus singleton handles agent communication
-- Future-compatible with A2A/MCP integration
-- All agents currently mock respond with "Hi"
+KEY FEATURES:
+- SDK Task Tracking: All tasks stored with timing, checkpoints & state
+- Smart Routing: HR queries bypass PAE for direct execution  
+- Agent Specialization: HR (data), FPA (finance), zAI (coordination)
+- Thread Management: Persistent task context via SDK client
+- Message Bus: Enhanced inter-agent communication
+- HITL Ready: Approval, clarification & context hooks (disabled)
 */
 
 const workflow = new StateGraph(PlanAnnotation)
@@ -100,7 +127,6 @@ const workflow = new StateGraph(PlanAnnotation)
   .addNode('simple', simpleResponse)
   .addNode('directAgentExecution', directAgentExecution)
   .addNode('createPlan', createPlan)
-  .addNode('executeStep', executeStep)
   .addNode('coordinateAgents', coordinateAgents)
   .addNode('stepApproval', stepApproval)
   .addNode('stepClarification', stepClarification)
@@ -110,7 +136,6 @@ const workflow = new StateGraph(PlanAnnotation)
   .addEdge('__start__', 'classify')
   .addConditionalEdges('classify', shouldContinue)
   .addConditionalEdges('createPlan', shouldContinue)
-  .addConditionalEdges('executeStep', shouldContinue)
   .addConditionalEdges('coordinateAgents', shouldContinue)
   .addConditionalEdges('stepApproval', shouldContinue)
   .addConditionalEdges('stepClarification', shouldContinue)
