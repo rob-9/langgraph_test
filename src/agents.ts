@@ -48,30 +48,11 @@ class SDKMessageBus {
       return `Error: Agent ${message.to} not found`;
     }
 
-    // Agent-specific responses
-    switch (message.to) {
-      case 'HR':
-        // Check if this looks like a function call that should return data
-        if (/(get|fetch|find|query|retrieve|salary|employee|data)/i.test(message.content)) {
-          const randomValue = Math.floor(Math.random() * 100000) + 50000;
-          return `HR Agent: GraphQL query executed. Result: ${randomValue}`;
-        }
-        return `HR Agent: Hi from ${targetAgent.name}`;
-        
-      case 'FPA':
-        // Only respond to financial-related queries
-        if (/(financial|budget|revenue|profit|cost|expense|analysis|report|metric)/i.test(message.content)) {
-          return `FPA Agent: Financial analysis completed - Hi from ${targetAgent.name}`;
-        }
-        return `FPA Agent: This task is outside my financial domain - Hi from ${targetAgent.name}`;
-        
-      default:
-        return `Hi from ${targetAgent.name}`;
-    }
+    return `hi`;
   }
 
-  async getMessageHistory(agentId?: string): Promise<AgentMessage[]> {
-    return await this.sdkClient.getAgentMessages(agentId);
+  async getMessageHistory(): Promise<AgentMessage[]> {
+    return await this.sdkClient.getAgentMessages();
   }
 }
 
@@ -146,17 +127,8 @@ export async function delegateTask(agentId: string, taskDescription: string, tas
 export async function coordinateAgents(state: typeof PlanAnnotation.State) {
   const currentStepIndex = state.currentStep || 0;
   const currentStepText = state.plan[currentStepIndex];
-  const sdkClient = getSDKClient();
   
-  // Initialize thread if not exists
-  let threadId = state.threadId;
-  if (!threadId) {
-    const thread = await sdkClient.createThread({
-      step: currentStepIndex,
-      plan: state.plan
-    });
-    threadId = thread.thread_id;
-  }
+  console.log(`\nStep ${currentStepIndex + 1}/${state.plan?.length || 0}: ${currentStepText}`);
   
   // Determine which agent should handle this task
   const responsibleAgent = determineResponsibleAgent(currentStepText);
@@ -190,14 +162,7 @@ export async function coordinateAgents(state: typeof PlanAnnotation.State) {
     messageType: 'task_delegation'
   };
   
-  // Update thread state
-  await sdkClient.updateThreadState(threadId, {
-    currentStep: currentStepIndex + 1,
-    lastCompletedTask: agentTask
-  });
-  
   return {
-    threadId,
     currentStep: currentStepIndex + 1,
     currentAgent: responsibleAgent,
     tasks: [agentTask],

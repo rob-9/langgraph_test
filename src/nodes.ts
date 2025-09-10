@@ -133,6 +133,8 @@ export async function createPlan(state: typeof PlanAnnotation.State) {
   // Convert to simple string array for compatibility with existing code
   const planSteps = steps.map(step => `[${step.agent}] ${step.text}`);
   
+  console.log('Plan created:', planSteps);
+  
   return {
     plan: planSteps,
     currentStep: 0,

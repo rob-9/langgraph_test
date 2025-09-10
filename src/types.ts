@@ -13,15 +13,6 @@ export interface AgentTask extends ThreadTask {
   endTime?: Date;
 }
 
-export interface PlanState {
-  messages: (HumanMessage | AIMessage)[];
-  isComplex: boolean;
-  tasks: AgentTask[];
-  allTasksCompleted: boolean;
-  executionResults: string[];
-  threadId?: string;
-  runId?: string;
-}
 
 export interface AgentMessage {
   id: string;
@@ -45,5 +36,4 @@ export interface AgentResponse {
 export interface SDKConfig {
   apiUrl?: string;
   apiKey?: string;
-  enablePersistence?: boolean;
 }

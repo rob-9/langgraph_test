@@ -113,13 +113,6 @@ WORKFLOW GRAPH:
                                    v
                                 __end__
 
-KEY FEATURES:
-- SDK Task Tracking: All tasks stored with timing, checkpoints & state
-- Smart Routing: HR queries bypass PAE for direct execution  
-- Agent Specialization: HR (data), FPA (finance), zAI (coordination)
-- Thread Management: Persistent task context via SDK client
-- Message Bus: Enhanced inter-agent communication
-- HITL Ready: Approval, clarification & context hooks (disabled)
 */
 
 const workflow = new StateGraph(PlanAnnotation)
@@ -149,15 +142,6 @@ const app = workflow.compile();
 async function runAgent(userInput: string) {
   console.log(`\n=== Query: ${userInput} ===`);
   
-  // Initialize SDK client for enhanced task tracking
-  const sdkClient = getSDKClient();
-  
-  // Create thread for persistent task tracking
-  const thread = await sdkClient.createThread({
-    query: userInput,
-    startTime: new Date().toISOString()
-  });
-  
   const initialState = {
     messages: [new HumanMessage(userInput)],
     isComplex: false,
@@ -167,7 +151,6 @@ async function runAgent(userInput: string) {
     delegatedTasks: {},
     agentResponses: {},
     tasks: [],
-    threadId: thread.thread_id,
     taskCheckpoints: {},
     taskInterrupts: {}
   };
@@ -199,11 +182,6 @@ async function runAgent(userInput: string) {
       if (nodeResult.tasks && nodeResult.tasks.length > 0) {
         const task = nodeResult.tasks[0];
         console.log(`  └─ Task: ${task.id} (${task.assignedAgent}) - ${task.result ? 'Completed' : 'In Progress'}`);
-        
-        if (task.startTime && task.endTime) {
-          const duration = new Date(task.endTime).getTime() - new Date(task.startTime).getTime();
-          console.log(`  └─ Duration: ${duration}ms`);
-        }
       }
     }
   }
@@ -219,28 +197,39 @@ async function main() {
   
   console.log('Agents: zAI (orchestrator), HR (leaf), FPA (leaf)');
   
-  // Initialize SDK client and cleanup old data
-  const sdkClient = getSDKClient();
-  await sdkClient.cleanupExpiredData();
-  
   try {
+    const sdkClient = getSDKClient();
+    
+    // Clear and run first query
+    sdkClient.clearTasks();
     await runAgent('Hello! Can you tell me what you are?');
+    await showTaskSummary();
+    
+    // Clear and run second query  
+    sdkClient.clearTasks();
     await runAgent('Hello. please get Amanda salary.');
+    await showTaskSummary();
+    
+    // Clear and run third query
+    sdkClient.clearTasks();
     await runAgent('Analyze our quarterly budget and create a financial report');
-    
-    // Optional: Show task tracking summary
-    console.log('\nTask Tracking Summary:');
-    const hrTasks = await sdkClient.getAgentTasks('HR');
-    const fpaTasks = await sdkClient.getAgentTasks('FPA');
-    const zaiTasks = await sdkClient.getAgentTasks('zAI');
-    
-    console.log(`  HR Agent: ${hrTasks.length} tasks completed`);
-    console.log(`  FPA Agent: ${fpaTasks.length} tasks completed`);
-    console.log(`  zAI Agent: ${zaiTasks.length} tasks completed`);
+    await showTaskSummary();
     
   } catch (error) {
     console.error('Error running agent:', error);
   }
+}
+
+async function showTaskSummary() {
+  const sdkClient = getSDKClient();
+  console.log('\nTask Tracking Summary:');
+  const hrTasks = await sdkClient.getAgentTasks('HR');
+  const fpaTasks = await sdkClient.getAgentTasks('FPA');
+  const zaiTasks = await sdkClient.getAgentTasks('zAI');
+  
+  console.log(`  HR Agent: ${hrTasks.length} tasks completed`);
+  console.log(`  FPA Agent: ${fpaTasks.length} tasks completed`);
+  console.log(`  zAI Agent: ${zaiTasks.length} tasks completed`);
 }
 
 if (require.main === module) {

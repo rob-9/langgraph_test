@@ -21,7 +21,6 @@ export const SYSTEM_CONFIG: SystemConfig = {
 export const SDK_CONFIG = {
   apiUrl: process.env.LANGGRAPH_API_URL,
   apiKey: process.env.LANGGRAPH_API_KEY || process.env.LANGSMITH_API_KEY,
-  enablePersistence: process.env.ENABLE_SDK_PERSISTENCE === 'true' || false,
   timeout: 30000,
   maxRetries: 3
 };
@@ -45,7 +44,7 @@ export const AGENT_CONFIGS: Record<string, AgentConfig> = {
   },
   FPA: {
     id: 'FPA',
-    name: 'Financial Process Automation',
+    name: 'FPA',
     description: 'Agent specializing in financial analysis, reporting, and financial metrics only',
     capabilities: ['financial_analysis', 'financial_reporting', 'budgeting', 'financial_metrics', 'revenue_analysis', 'profit_analysis', 'burn_rate', 'runway_calculation'],
     enable_hitl: false,

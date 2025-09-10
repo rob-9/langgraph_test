@@ -88,14 +88,6 @@ export const PlanAnnotation = Annotation.Root({
     reducer: (prev = {}, next = {}) => ({ ...prev, ...next })
   }),
   
-  // SDK integration fields
-  threadId: Annotation<string>({
-    reducer: (x, y) => y ?? x
-  }),
-  
-  runId: Annotation<string>({
-    reducer: (x, y) => y ?? x
-  }),
   
   // Enhanced task state with SDK features
   taskCheckpoints: Annotation<{[taskId: string]: any}>({
